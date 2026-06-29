@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Political Discourse Analyzer</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --sidebar-bg: rgba(17, 24, 39, 0.7);
+            --card-bg: rgba(31, 41, 55, 0.45);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+            --accent-cyan: #06b6d4;
+            --accent-purple: #a855f7;
+            --accent-indigo: #6366f1;
+            --accent-pink: #ec4899;
+            --accent-green: #10b981;
+            --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.12) 0%, transparent 40%);
+        }
+
+        /* Sidebar styling */
+        .sidebar {
+            width: 320px;
+            background: var(--sidebar-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            font-size: 28px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .history-list::-webkit-scrollbar {
+            width: 5px;
+        }
+        .history-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .history-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--accent-indigo);
+            transform: translateY(-2px);
+        }
+
+        .history-item.active {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: var(--accent-indigo);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+        }
+
+        .history-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-meta {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-source {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            max-width: 60%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Main Content Panel */
+        .main-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .header {
+            padding: 24px 40px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-info h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .header-info p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .content-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        .content-area::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        /* Input Form */
+        .analyzer-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: var(--transition);
+        }
+
+        .analyzer-card:focus-within {
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 8px 32px 0 rgba(99, 102, 241, 0.1);
+        }
+
+        .textarea-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            background: rgba(10, 15, 30, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            padding: 16px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        textarea:focus {
+            border-color: var(--accent-indigo);
+            background: rgba(10, 15, 30, 0.8);
+        }
+
+        .input-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .input-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .analyze-btn {
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            padding: 12px 28px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: var(--transition);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+            filter: brightness(1.1);
+        }
+
+        .analyze-btn:disabled {
+            background: #374151;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+            filter: none;
+        }
+
+        /* Loading / Step Tracker state */
+        .loading-container {
+            display: none;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 32px;
+            box-shadow: var(--shadow);
+            flex-direction: column;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--accent-indigo);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        .steps-tracker {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            opacity: 0.4;
+            transition: var(--transition);
+        }
+
+        .step-item.active {
+            opacity: 1;
+            color: var(--text-primary);
+        }
+
+        .step-item.completed {
+            opacity: 0.8;
+            color: var(--accent-green);
+        }
+
+        .step-icon {
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .step-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Report Viewer Container */
+        .results-container {
+            display: none;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Tabs layout */
+        .tabs-header {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 1px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: var(--transition);
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--accent-indigo);
+        }
+
+        .tab-btn[data-tab="pareto"].active { border-bottom-color: var(--accent-cyan); }
+        .tab-btn[data-tab="sowell"].active { border-bottom-color: var(--accent-purple); }
+        .tab-btn[data-tab="mass_psych"].active { border-bottom-color: var(--accent-pink); }
+        .tab-btn[data-tab="foucault"].active { border-bottom-color: var(--accent-indigo); }
+
+        .tabs-content {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: var(--shadow);
+            min-height: 400px;
+        }
+
+        .tab-pane {
+            display: none;
+            line-height: 1.8;
+            font-size: 15px;
+        }
+
+        .tab-pane.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Markdown Styling inside report content */
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+            font-family: 'Outfit', sans-serif;
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .markdown-body h1 { font-size: 22px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+        .markdown-body h2 { font-size: 18px; }
+        .markdown-body h3 { font-size: 16px; }
+
+        .markdown-body p {
+            margin-bottom: 16px;
+            color: rgba(243, 244, 246, 0.9);
+        }
+
+        .markdown-body ul, .markdown-body ol {
+            margin-bottom: 16px;
+            padding-left: 24px;
+        }
+
+        .markdown-body li {
+            margin-bottom: 8px;
+        }
+
+        .markdown-body blockquote {
+            border-left: 4px solid var(--accent-indigo);
+            padding: 8px 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 16px;
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+
+        .markdown-body code {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .framework-summary {
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            border-left: 4px solid var(--accent-cyan);
+            margin-bottom: 30px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .framework-summary.pareto { border-left-color: var(--accent-cyan); }
+        .framework-summary.sowell { border-left-color: var(--accent-purple); }
+        .framework-summary.mass_psych { border-left-color: var(--accent-pink); }
+        .framework-summary.foucault { border-left-color: var(--accent-indigo); }
+
+        /* Welcome Screen */
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+            gap: 20px;
+            max-width: 600px;
+            margin: 40px auto;
+        }
+
+        .welcome-icon {
+            font-size: 64px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.05); opacity: 1; }
+        }
+
+        .welcome-screen h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .welcome-screen p {
+            color: var(--text-secondary);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .original-text-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .original-text-card[open] {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .original-text-card summary {
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            outline: none;
+            user-select: none;
+        }
+        .original-text-card summary i {
+            margin-right: 8px;
+            color: #c084fc;
+        }
+        .original-text-content {
+            margin-top: 15px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            max-height: 250px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar History -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="bx bx-analyse logo-icon"></i>
+            <h1>Discourse Analyzer</h1>
+        </div>
+        <div class="history-list" id="historyList">
+            <!-- Dynamically populated -->
+        </div>
+    </div>
+
+    <!-- Main Panel -->
+    <div class="main-panel">
+        <div class="header">
+            <div class="header-info">
+                <h2>Political Discourse Analyzer</h2>
+                <p>Deconstruct political speech and articles through five classical sociology & philosophy frameworks</p>
+            </div>
+            <div>
+                <!-- Extra top actions if needed -->
+            </div>
+        </div>
+
+        <div class="content-area">
+            <!-- Analyze Input Card -->
+            <div class="analyzer-card">
+                <div class="textarea-wrapper">
+                    <textarea id="inputText" placeholder="Paste a political speech, essay, news article body, or input a website URL (starts with http:// or https://) here..."></textarea>
+                </div>
+                <div class="input-actions">
+                    <div class="input-hint">
+                        <i class="bx bx-info-circle"></i>
+                        <span>URLs will be scraped automatically. Supports Pareto, Sowell, Le Bon, Hoffer, Foucault.</span>
+                    </div>
+                    <button class="analyze-btn" id="analyzeBtn" onclick="startAnalysis()">
+                        <i class="bx bx-rocket"></i>
+                        <span>Start Analysis</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading steps tracker -->
+            <div class="loading-container" id="loadingContainer">
+                <div class="spinner"></div>
+                <div class="steps-tracker">
+                    <div class="step-item active" id="step1">
+                        <div class="step-icon"><i class="bx bx-import"></i></div>
+                        <div class="step-text">Step 1: Reading input & fetching webpage content (InputAgent)...</div>
+                    </div>
+                    <div class="step-item" id="step2">
+                        <div class="step-icon"><i class="bx bx-git-repo-forked"></i></div>
+                        <div class="step-text">Step 2: Pareto, Sowell, Le Bon, Hoffer, and Foucault analyzing in parallel...</div>
+                    </div>
+                    <div class="step-item" id="step3">
+                        <div class="step-icon"><i class="bx bx-file"></i></div>
+                        <div class="step-text">Step 3: Synthesizer compiling report and saving to SQLite DB...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Welcome screen before first run -->
+            <div class="welcome-screen" id="welcomeScreen">
+                <i class="bx bx-brain welcome-icon"></i>
+                <h3>Start Deconstructing Discourse</h3>
+                <p>Enter text or a news link above to initiate the multi-agent analysis. You'll get detailed reports comparing residues, derivations, political visions, crowd suggestibility, and power-knowledge dynamics.</p>
+            </div>
+
+            <!-- Analysis Report Viewer -->
+            <div class="results-container" id="resultsContainer">
+                <div class="tabs-header">
+                    <button class="tab-btn active" data-tab="final" onclick="switchTab('final')"><i class="bx bx-file"></i> Synthesis Report</button>
+                    <button class="tab-btn" data-tab="pareto" onclick="switchTab('pareto')"><i class="bx bx-grid-alt"></i> Pareto Lens</button>
+                    <button class="tab-btn" data-tab="sowell" onclick="switchTab('sowell')"><i class="bx bx-show"></i> Sowell Lens</button>
+                    <button class="tab-btn" data-tab="mass_psych" onclick="switchTab('mass_psych')"><i class="bx bx-group"></i> Crowd & Mass</button>
+                    <button class="tab-btn" data-tab="foucault" onclick="switchTab('foucault')"><i class="bx bx-key"></i> Foucault Lens</button>
+                </div>
+
+                <div class="tabs-content">
+                    <!-- Final Synthesis -->
+                    <div class="tab-pane active markdown-body" id="tabContent-final">
+                        <!-- Loaded markdown -->
+                    </div>
+                    <!-- Pareto -->
+                    <div class="tab-pane" id="tabContent-pareto">
+                        <div class="framework-summary pareto">
+                            <strong>Vilfredo Pareto's Lens:</strong> Explores the non-rational instincts (Residues) driving the speech and the rhetorical facades (Derivations) used to justify them. Look for Class I (Combinations/persuasion) vs Class II (Group loyalty/tradition/force) residues, and derivations appealing to authority, assertion, sentiments, or verbal sophistry.
+                        </div>
+                        <div class="markdown-body" id="tabMarkdown-pareto"></div>
+                    </div>
+                    <!-- Sowell -->
+                    <div class="tab-pane" id="tabContent-sowell">
+                        <div class="framework-summary sowell">
+                            <strong>Thomas Sowell's Lens:</strong> Evaluates whether the discourse assumes a <em>Constrained (Tragic) Vision</em> of human nature (humanity is limited; we must make trade-offs using systemic rules and traditions) or an <em>Unconstrained (Utopian) Vision</em> (humanity is perfectible; problems can be solved directly by reason and expert planners).
+                        </div>
+                        <div class="markdown-body" id="tabMarkdown-sowell"></div>
+                    </div>
+                    <!-- Mass Psych -->
+                    <div class="tab-pane" id="tabContent-mass_psych">
+                        <div class="framework-summary mass_psych">
+                            <strong>Gustave Le Bon & Eric Hoffer's Lens:</strong> Highlights crowd suggestibility, contagion, absolute affirmation, and repetition (Le Bon). Maps the True Believer psychology—frustration, self-renunciation, escape into a holy collective, and the manufacture of a unifying common devil or enemy (Hoffer).
+                        </div>
+                        <div class="markdown-body" id="tabMarkdown-mass_psych"></div>
+                    </div>
+                    <!-- Foucault -->
+                    <div class="tab-pane" id="tabContent-foucault">
+                        <div class="framework-summary foucault">
+                            <strong>Michel Foucault's Lens:</strong> Analyzes the linkages of <em>Power and Knowledge (pouvoir-savoir)</em>. Investigates the Regimes of Truth constructed to make certain truth claims function as authoritative, and checks for biopolitical regulation (governing population metrics) or disciplinary/surveillance normalization mechanisms.
+                        </div>
+                        <div class="markdown-body" id="tabMarkdown-foucault"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load initial history on page load
+        document.addEventListener("DOMContentLoaded", () => {
+            loadHistory();
+        });
+
+        // Load list of past reports
+        async function loadHistory() {
+            try {
+                const res = await fetch("/history");
+                const history = await res.json();
+                
+                const historyList = document.getElementById("historyList");
+                historyList.innerHTML = "";
+                
+                if (history.error) {
+                    console.error("DB History Error:", history.error);
+                    return;
+                }
+                
+                history.forEach(item => {
+                    const date = new Date(item.created_at + "Z").toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    const div = document.createElement("div");
+                    div.className = "history-item";
+                    div.id = `history-item-${item.id}`;
+                    div.onclick = () => loadSavedReport(item.id);
+                    
+                    const sourceText = item.source.startsWith("http") ? item.source : "Pasted Text";
+                    const sourceIcon = item.source.startsWith("http") ? "bx-link" : "bx-paste";
+                    
+                    div.innerHTML = `
+                        <div class="history-title">${item.title}</div>
+                        <div class="history-meta">
+                            <span class="history-source"><i class="bx ${sourceIcon}"></i> ${sourceText}</span>
+                            <span>${date}</span>
+                        </div>
+                    `;
+                    historyList.appendChild(div);
+                });
+            } catch (e) {
+                console.error("Failed to load history:", e);
+            }
+        }
+
+        // Start running analysis
+        async function startAnalysis() {
+            const inputText = document.getElementById("inputText").value.trim();
+            if (!inputText) return;
+            
+            // UI State adjustments
+            document.getElementById("analyzeBtn").disabled = true;
+            document.getElementById("welcomeScreen").style.display = "none";
+            document.getElementById("resultsContainer").style.display = "none";
+            
+            const loadingContainer = document.getElementById("loadingContainer");
+            loadingContainer.style.display = "flex";
+            
+            // Clear active history items
+            document.querySelectorAll(".history-item").forEach(el => el.classList.remove("active"));
+            
+            // Steps simulation timeline
+            setStepState(1, "active");
+            setStepState(2, "pending");
+            setStepState(3, "pending");
+            
+            // Simulate agent transitions visually
+            const t1 = setTimeout(() => {
+                setStepState(1, "completed");
+                setStepState(2, "active");
+            }, 4000);
+            
+            const t2 = setTimeout(() => {
+                setStepState(2, "completed");
+                setStepState(3, "active");
+            }, 12000);
+
+            try {
+                const res = await fetch("/analyze", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ input_text: inputText })
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Server error occurred");
+                }
+                
+                const data = await res.json();
+                
+                clearTimeout(t1);
+                clearTimeout(t2);
+                
+                // Set all steps completed
+                setStepState(1, "completed");
+                setStepState(2, "completed");
+                setStepState(3, "completed");
+                
+                setTimeout(() => {
+                    loadingContainer.style.display = "none";
+                    document.getElementById("analyzeBtn").disabled = false;
+                    displayReport(data);
+                    loadHistory(); // Reload history sidebar
+                }, 1000);
+                
+            } catch (e) {
+                clearTimeout(t1);
+                clearTimeout(t2);
+                alert("Analysis failed: " + e.message);
+                loadingContainer.style.display = "none";
+                document.getElementById("analyzeBtn").disabled = false;
+                document.getElementById("welcomeScreen").style.display = "flex";
+            }
+        }
+
+        function setStepState(stepNum, state) {
+            const stepEl = document.getElementById(`step${stepNum}`);
+            stepEl.className = "step-item " + state;
+            const iconEl = stepEl.querySelector(".step-icon i");
+            
+            if (state === "completed") {
+                iconEl.className = "bx bx-check-circle";
+            } else if (state === "active") {
+                iconEl.className = "bx bx-loader-alt bx-spin";
+            } else {
+                if (stepNum === 1) iconEl.className = "bx bx-import";
+                if (stepNum === 2) iconEl.className = "bx bx-git-repo-forked";
+                if (stepNum === 3) iconEl.className = "bx bx-file";
+            }
+        }
+
+        function buildOriginalTextHtml(originalText) {
+            if (!originalText) return "";
+            return `
+                <details class="original-text-card">
+                    <summary><i class="bx bx-file-blank"></i> View Original Input Text</summary>
+                    <div class="original-text-content">${originalText}</div>
+                </details>
+            `;
+        }
+
+        // Render markdown results on tabs
+        function displayReport(data) {
+            document.getElementById("resultsContainer").style.display = "flex";
+            
+            // Synthesis Markdown + Original Text collapsible
+            const origHtml = buildOriginalTextHtml(data.article_text);
+            document.getElementById("tabContent-final").innerHTML = origHtml + marked.parse(data.final_report);
+            
+            // Individual analyses
+            document.getElementById("tabMarkdown-pareto").innerHTML = marked.parse(data.pareto_analysis);
+            document.getElementById("tabMarkdown-sowell").innerHTML = marked.parse(data.sowell_analysis);
+            document.getElementById("tabMarkdown-mass_psych").innerHTML = marked.parse(data.mass_psych_analysis);
+            document.getElementById("tabMarkdown-foucault").innerHTML = marked.parse(data.foucault_analysis);
+            
+            switchTab('final');
+        }
+
+        // Load a specific report from history database
+        async function loadSavedReport(id) {
+            // UI state adjustments
+            document.getElementById("welcomeScreen").style.display = "none";
+            document.getElementById("loadingContainer").style.display = "none";
+            
+            // Set active class in sidebar
+            document.querySelectorAll(".history-item").forEach(el => el.classList.remove("active"));
+            const activeItem = document.getElementById(`history-item-${id}`);
+            if (activeItem) activeItem.classList.add("active");
+            
+            try {
+                const res = await fetch(`/history/${id}`);
+                const report = await res.json();
+                
+                // Render synthesis report + Original Text collapsible
+                document.getElementById("resultsContainer").style.display = "flex";
+                const origHtml = buildOriginalTextHtml(report.original_text);
+                document.getElementById("tabContent-final").innerHTML = origHtml + marked.parse(report.report_md);
+                
+                // For saved reports, load the actual saved specialist analyses!
+                document.getElementById("tabMarkdown-pareto").innerHTML = report.pareto_analysis ? marked.parse(report.pareto_analysis) : "<p>No Pareto analysis saved for this report.</p>";
+                document.getElementById("tabMarkdown-sowell").innerHTML = report.sowell_analysis ? marked.parse(report.sowell_analysis) : "<p>No Sowell analysis saved for this report.</p>";
+                document.getElementById("tabMarkdown-mass_psych").innerHTML = report.mass_psych_analysis ? marked.parse(report.mass_psych_analysis) : "<p>No Mass Psychology analysis saved for this report.</p>";
+                document.getElementById("tabMarkdown-foucault").innerHTML = report.foucault_analysis ? marked.parse(report.foucault_analysis) : "<p>No Foucault analysis saved for this report.</p>";
+                
+                switchTab('final');
+            } catch (e) {
+                alert("Failed to load saved report: " + e.message);
+            }
+        }
+
+        // Tab switcher
+        function switchTab(tabId) {
+            document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+            document.querySelectorAll(".tab-pane").forEach(pane => pane.classList.remove("active"));
+            
+            document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add("active");
+            document.getElementById(`tabContent-${tabId}`).classList.add("active");
+        }
+    </script>
+</body>
+</html>

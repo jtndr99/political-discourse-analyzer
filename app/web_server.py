@@ -1,0 +1,213 @@
+import logging
+import os
+import sqlite3
+import sys
+import uuid
+
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+# Ensure the parent directory is in python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+
+from app.agent import root_agent
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("discourse_anal_web")
+
+app = FastAPI(title="Political Discourse Analyzer Dashboard")
+
+# SQLite DB Path (Shared with MCP Server)
+DB_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "analyses.db"
+)
+
+# Jinja2 Templates setup
+TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
+os.makedirs(TEMPLATES_DIR, exist_ok=True)
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+
+class AnalysisRequest(BaseModel):
+    input_text: str
+
+
+@app.get("/", response_class=HTMLResponse)
+async def get_dashboard(request: Request):
+    return templates.TemplateResponse(
+        request=request, name="dashboard.html", context={"request": request}
+    )
+
+
+@app.post("/analyze")
+async def analyze_discourse(payload: AnalysisRequest):
+    input_text = payload.input_text.strip()
+    if not input_text:
+        raise HTTPException(status_code=400, detail="Input text or URL cannot be empty")
+
+    user_id = "web_user"
+    session_id = str(uuid.uuid4())
+    app_name = "app"
+
+    logger.info(f"Starting analysis for session {session_id}...")
+
+    # Initialize ADK runner and session service
+    session_service = InMemorySessionService()
+    await session_service.create_session(
+        app_name=app_name, user_id=user_id, session_id=session_id
+    )
+    runner = Runner(
+        agent=root_agent, app_name=app_name, session_service=session_service
+    )
+
+    try:
+        # Run agent programmatically with the user input
+        async for event in runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=types.Content(
+                role="user", parts=[types.Part.from_text(text=input_text)]
+            ),
+        ):
+            # Log sub-agent execution status in the console
+            if event.author:
+                logger.info(f"[{event.author}] Event generated")
+
+        # Retrieve the accumulated state containing individual sub-agent analyses
+        session = await session_service.get_session(
+            app_name=app_name, user_id=user_id, session_id=session_id
+        )
+        state = session.state
+
+        # Build payload response
+        final_report = state.get("final_report", "No final report generated.")
+        original_text = state.get("article_text", input_text)
+        pareto_analysis = state.get("pareto_analysis", "No Pareto analysis generated.")
+        sowell_analysis = state.get("sowell_analysis", "No Sowell analysis generated.")
+        mass_psych_analysis = state.get(
+            "mass_psych_analysis", "No Mass Psychology analysis generated."
+        )
+        foucault_analysis = state.get(
+            "foucault_analysis", "No Foucault analysis generated."
+        )
+
+        if (
+            "saved analysis report" in final_report.lower()
+            or len(final_report.strip()) < 300
+        ):
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT report_md, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis FROM analyses ORDER BY id DESC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                conn.close()
+                if row:
+                    final_report = row[0]
+                    if row[1]:
+                        original_text = row[1]
+                    if row[2]:
+                        pareto_analysis = row[2]
+                    if row[3]:
+                        sowell_analysis = row[3]
+                    if row[4]:
+                        mass_psych_analysis = row[4]
+                    if row[5]:
+                        foucault_analysis = row[5]
+            except Exception as e:
+                logger.error(f"Failed to fetch report from DB: {e}")
+
+        response_data = {
+            "session_id": session_id,
+            "article_text": original_text,
+            "pareto_analysis": pareto_analysis,
+            "sowell_analysis": sowell_analysis,
+            "mass_psych_analysis": mass_psych_analysis,
+            "foucault_analysis": foucault_analysis,
+            "final_report": final_report,
+        }
+
+        return JSONResponse(content=response_data)
+
+    except Exception as e:
+        logger.error(f"Error during analysis: {e!s}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {e!s}") from e
+
+
+@app.get("/history")
+async def get_history():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, title, source, summary, created_at FROM analyses ORDER BY id DESC"
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        reports = []
+        for row in rows:
+            reports.append(
+                {
+                    "id": row[0],
+                    "title": row[1],
+                    "source": row[2],
+                    "summary": row[3],
+                    "created_at": row[4],
+                }
+            )
+        return JSONResponse(content=reports)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.get("/history/{report_id}")
+async def get_report(report_id: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, title, source, report_md, summary, created_at, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis FROM analyses WHERE id = ?",
+            (report_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            raise HTTPException(status_code=404, detail="Report not found")
+
+        report = {
+            "id": row[0],
+            "title": row[1],
+            "source": row[2],
+            "report_md": row[3],
+            "summary": row[4],
+            "created_at": row[5],
+            "original_text": row[6] or "",
+            "pareto_analysis": row[7] or "",
+            "sowell_analysis": row[8] or "",
+            "mass_psych_analysis": row[9] or "",
+            "foucault_analysis": row[10] or "",
+        }
+        return JSONResponse(content=report)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+if __name__ == "__main__":
+    # Ensure analyses.db is initialized before starting
+    from app.mcp_server import init_db
+
+    init_db()
+
+    # Run the web server
+    uvicorn.run("app.web_server:app", host="127.0.0.1", port=8000, reload=True)

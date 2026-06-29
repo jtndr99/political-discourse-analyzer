@@ -1,0 +1,26 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "pasted_speech_analysis",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Please analyze this speech:\n\n'My fellow citizens, we stand at a critical juncture. The forces of decay threaten the very foundations of our heritage, our families, and our sacred traditions. The elites in their ivory towers believe they can rewrite the rules of human nature, planning every detail of our lives from above, promising a utopia they can never deliver. But human nature is not a blank slate for their social engineering. We must rely on our time-tested institutions, on the rule of law, and on the hard trade-offs that have sustained us for generations. The real enemy is the hostile media and the foreign interests who want to divide us. They are the cancer in our body politic, and we must remain vigilant, normal, and united under a common standard.'"
+          }
+        ]
+      }
+    },
+    {
+      "eval_case_id": "url_speech_analysis",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Analyze this article URL: https://en.wikipedia.org/wiki/Vilfredo_Pareto"
+          }
+        ]
+      }
+    }
+  ]
+}
