@@ -34,12 +34,6 @@ def get_model():
     return Gemini(model=MODEL_NAME, retry_options=types.HttpRetryOptions(attempts=3))
 
 
-# Callback to prevent rate limits on the AI Studio free tier (5 RPM)
-async def rate_limit_delay(callback_context) -> None:
-    """No delay needed for gemini-1.5-flash free tier (15 RPM)."""
-    pass
-
-
 def create_input_agent() -> Agent:
     return Agent(
         name="InputAgent",
@@ -59,7 +53,6 @@ def create_pareto_analyst() -> Agent:
     return Agent(
         name="ParetoAnalyst",
         model=get_model(),
-        before_agent_callback=rate_limit_delay,
         instruction=(
             "You are an expert sociologist specializing in Vilfredo Pareto's theories. Analyze the political text stored in {article_text}. "
             "First, call the get_framework_definition tool for 'pareto' to retrieve the grounding concepts. "
@@ -78,7 +71,6 @@ def create_sowell_analyst() -> Agent:
     return Agent(
         name="SowellAnalyst",
         model=get_model(),
-        before_agent_callback=rate_limit_delay,
         instruction=(
             "You are an expert political theorist specializing in Thomas Sowell and Carl Schmitt. Analyze the political text stored in {article_text}. "
             "First, call the get_framework_definition tool for 'sowell' to retrieve the grounding concepts. "
@@ -97,7 +89,6 @@ def create_mass_psych_analyst() -> Agent:
     return Agent(
         name="MassPsychAnalyst",
         model=get_model(),
-        before_agent_callback=rate_limit_delay,
         instruction=(
             "You are an expert in crowd psychology and mass movements, specializing in Gustave Le Bon, Eric Hoffer, and René Girard. Analyze the political text stored in {article_text}. "
             "First, call the get_framework_definition tool for 'le_bon' and 'hoffer' using the get_framework_definition tool to retrieve the grounding concepts. "
@@ -115,7 +106,6 @@ def create_foucault_analyst() -> Agent:
     return Agent(
         name="FoucaultAnalyst",
         model=get_model(),
-        before_agent_callback=rate_limit_delay,
         instruction=(
             "You are an expert philosopher specializing in Michel Foucault. Analyze the political text stored in {article_text}. "
             "First, call the get_framework_definition tool for 'foucault' to retrieve the grounding concepts. "
@@ -134,7 +124,6 @@ def create_synthesizer() -> Agent:
     return Agent(
         name="Synthesizer",
         model=get_model(),
-        before_agent_callback=rate_limit_delay,
         instruction=(
             "You are a master political analyst and synthesizer. Review the original user input, the source, and the individual analyses:\n"
             "- Original Text: {article_text}\n"
@@ -149,11 +138,8 @@ def create_synthesizer() -> Agent:
             "2. Use bolding for key theoretical terms (e.g., **Residues**, **Biopower**, **Scapegoat**).\n"
             "3. Use blockquotes (>) for specific text citations.\n"
             "4. Ensure the tone is analytically neutral, rigorous, and devoid of conversational filler.\n"
-            "At the end, call the save_analysis_report tool to save the report to the SQLite database. "
-            "You MUST pass the title, source, report_md, the short summary, and ALSO pass original_text (from {article_text}), pareto_analysis, sowell_analysis, mass_psych_analysis, and foucault_analysis exactly as provided in the context templates. "
             "Your output must be the final markdown report itself."
         ),
-        tools=[mcp_toolset],
         output_key="final_report",
     )
 

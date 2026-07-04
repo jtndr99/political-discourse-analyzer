@@ -99,32 +99,61 @@ async def analyze_discourse(payload: AnalysisRequest):
             "foucault_analysis", "No Foucault analysis generated."
         )
 
-        if (
-            "saved analysis report" in final_report.lower()
-            or len(final_report.strip()) < 300
-        ):
-            try:
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT report_md, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis FROM analyses ORDER BY id DESC LIMIT 1"
-                )
-                row = cursor.fetchone()
-                conn.close()
-                if row:
-                    final_report = row[0]
-                    if row[1]:
-                        original_text = row[1]
-                    if row[2]:
-                        pareto_analysis = row[2]
-                    if row[3]:
-                        sowell_analysis = row[3]
-                    if row[4]:
-                        mass_psych_analysis = row[4]
-                    if row[5]:
-                        foucault_analysis = row[5]
-            except Exception as e:
-                logger.error(f"Failed to fetch report from DB: {e}")
+        # Programmatically parse title and summary from final_report
+        title = "Discourse Analysis"
+        summary = ""
+        lines = final_report.strip().split("\n")
+        for line in lines:
+            if line.startswith("# "):
+                title = line[2:].strip().replace("*", "").replace("_", "")
+                break
+
+        lower_report = final_report.lower()
+        summary_idx = -1
+        for keyword in ["executive summary", "summary"]:
+            summary_idx = lower_report.find(keyword)
+            if summary_idx != -1:
+                summary_text = final_report[summary_idx + len(keyword):].strip()
+                summary_text = summary_text.lstrip(":- \t\r\n")
+                end_idx = len(summary_text)
+                for term in ["\n\n", "\n#", "\n*"]:
+                    pos = summary_text.find(term)
+                    if pos != -1 and pos < end_idx:
+                        end_idx = pos
+                summary = summary_text[:end_idx].strip()
+                break
+        
+        if not summary:
+            # Fallback: first two content lines
+            content_lines = [l.strip() for l in lines if l.strip() and not l.startswith(("#", ">", "*", "-"))]
+            if content_lines:
+                summary = " ".join(content_lines[:2])
+                if len(summary) > 200:
+                    summary = summary[:197] + "..."
+
+        # Save to SQLite database programmatically
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO analyses (title, source, report_md, summary, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    title,
+                    input_text,
+                    final_report,
+                    summary,
+                    original_text,
+                    pareto_analysis,
+                    sowell_analysis,
+                    mass_psych_analysis,
+                    foucault_analysis,
+                ),
+            )
+            conn.commit()
+            conn.close()
+            logger.info("Successfully saved analysis report to SQLite database programmatically.")
+        except Exception as e:
+            logger.error(f"Failed to save analysis report to database: {e}")
 
         response_data = {
             "session_id": session_id,
