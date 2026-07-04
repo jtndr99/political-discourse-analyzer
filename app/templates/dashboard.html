@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Political Discourse Analyzer</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -565,15 +567,118 @@
             border-radius: 8px;
             white-space: pre-wrap;
         }
+
+        /* Sidebar Search */
+        .sidebar-search {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .search-box-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .search-box-wrapper i {
+            position: absolute;
+            left: 12px;
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+        .sidebar-search-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px 8px 36px;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            outline: none;
+            transition: var(--transition);
+        }
+        .sidebar-search-input:focus {
+            border-color: var(--accent-indigo);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        /* Copy Button Wrapper */
+        .tabs-content-wrapper {
+            position: relative;
+        }
+        .copy-report-btn {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 16px;
+            padding: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+        }
+        .copy-report-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .copy-report-btn.copied {
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        /* Pulsing Skeleton Loaders */
+        .skeleton-loader {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            margin-top: 16px;
+            box-sizing: border-box;
+        }
+        .skeleton-line {
+            height: 12px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.03) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 6px;
+        }
+        .skeleton-line.h1 { height: 24px; width: 45%; margin-bottom: 12px; }
+        .skeleton-line.h2 { height: 18px; width: 30%; margin-top: 12px; margin-bottom: 8px; }
+        .skeleton-line.p1 { width: 95%; }
+        .skeleton-line.p2 { width: 88%; }
+        .skeleton-line.p3 { width: 75%; }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     </style>
 </head>
 <body>
 
     <!-- Sidebar History -->
     <div class="sidebar">
-        <div class="sidebar-header">
+        <div class="sidebar-header" onclick="resetDashboard()" style="cursor: pointer; user-select: none;" title="Reset Dashboard">
             <i class="bx bx-analyse logo-icon"></i>
             <h1>Discourse Analyzer</h1>
+        </div>
+        <div class="sidebar-search">
+            <div class="search-box-wrapper">
+                <i class="bx bx-search"></i>
+                <input type="text" class="sidebar-search-input" id="searchHistory" placeholder="Filter history..." oninput="filterHistory()">
+            </div>
         </div>
         <div class="history-list" id="historyList">
             <!-- Dynamically populated -->
@@ -601,7 +706,7 @@
                 <div class="input-actions">
                     <div class="input-hint">
                         <i class="bx bx-info-circle"></i>
-                        <span>URLs will be scraped automatically. Supports Pareto, Sowell, Le Bon, Hoffer, Foucault.</span>
+                        <span>URLs will be scraped automatically. Supports Pareto, Sowell, Schmitt, Le Bon, Hoffer, Girard, Foucault.</span>
                     </div>
                     <button class="analyze-btn" id="analyzeBtn" onclick="startAnalysis()">
                         <i class="bx bx-rocket"></i>
@@ -627,6 +732,15 @@
                         <div class="step-text">Step 3: Synthesizer compiling report and saving to SQLite DB...</div>
                     </div>
                 </div>
+                <div class="skeleton-loader">
+                    <div class="skeleton-line h1"></div>
+                    <div class="skeleton-line p1"></div>
+                    <div class="skeleton-line p2"></div>
+                    <div class="skeleton-line p3"></div>
+                    <div class="skeleton-line h2"></div>
+                    <div class="skeleton-line p1"></div>
+                    <div class="skeleton-line p2"></div>
+                </div>
             </div>
 
             <!-- Welcome screen before first run -->
@@ -646,7 +760,11 @@
                     <button class="tab-btn" data-tab="foucault" onclick="switchTab('foucault')"><i class="bx bx-key"></i> Foucault Lens</button>
                 </div>
 
-                <div class="tabs-content">
+                <div class="tabs-content-wrapper">
+                    <button class="copy-report-btn" id="copyReportBtn" onclick="copyReportToClipboard()" title="Copy Markdown Report">
+                        <i class="bx bx-copy"></i>
+                    </button>
+                    <div class="tabs-content">
                     <!-- Final Synthesis -->
                     <div class="tab-pane active markdown-body" id="tabContent-final">
                         <!-- Loaded markdown -->
@@ -685,6 +803,8 @@
     </div>
 
     <script>
+        let currentMarkdownReport = "";
+
         // Load initial history on page load
         document.addEventListener("DOMContentLoaded", () => {
             loadHistory();
@@ -729,6 +849,9 @@
                     `;
                     historyList.appendChild(div);
                 });
+                
+                // Keep the filter active if there is a query typed in the searchbox
+                filterHistory();
             } catch (e) {
                 console.error("Failed to load history:", e);
             }
@@ -833,6 +956,7 @@
 
         // Render markdown results on tabs
         function displayReport(data) {
+            currentMarkdownReport = data.final_report;
             document.getElementById("resultsContainer").style.display = "flex";
             
             // Synthesis Markdown + Original Text collapsible
@@ -862,6 +986,7 @@
             try {
                 const res = await fetch(`/history/${id}`);
                 const report = await res.json();
+                currentMarkdownReport = report.report_md;
                 
                 // Render synthesis report + Original Text collapsible
                 document.getElementById("resultsContainer").style.display = "flex";
@@ -887,6 +1012,49 @@
             
             document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add("active");
             document.getElementById(`tabContent-${tabId}`).classList.add("active");
+        }
+
+        // Reset Dashboard
+        function resetDashboard() {
+            document.getElementById("inputText").value = "";
+            document.getElementById("resultsContainer").style.display = "none";
+            document.getElementById("loadingContainer").style.display = "none";
+            document.getElementById("welcomeScreen").style.display = "flex";
+            document.querySelectorAll(".history-item").forEach(el => el.classList.remove("active"));
+        }
+
+        // Filter History
+        function filterHistory() {
+            const queryEl = document.getElementById("searchHistory");
+            if (!queryEl) return;
+            const query = queryEl.value.toLowerCase().trim();
+            document.querySelectorAll(".history-item").forEach(item => {
+                const title = item.querySelector(".history-title").textContent.toLowerCase();
+                const source = item.querySelector(".history-meta").textContent.toLowerCase();
+                if (title.includes(query) || source.includes(query)) {
+                    item.style.display = "block";
+                } else {
+                    item.style.display = "none";
+                }
+            });
+        }
+
+        // Copy markdown report to clipboard
+        async function copyReportToClipboard() {
+            if (!currentMarkdownReport) return;
+            try {
+                await navigator.clipboard.writeText(currentMarkdownReport);
+                const btn = document.getElementById("copyReportBtn");
+                btn.classList.add("copied");
+                btn.innerHTML = '<i class="bx bx-check"></i>';
+                setTimeout(() => {
+                    btn.classList.remove("copied");
+                    btn.innerHTML = '<i class="bx bx-copy"></i>';
+                }, 2000);
+            } catch (err) {
+                console.error("Failed to copy text: ", err);
+                alert("Failed to copy report to clipboard.");
+            }
         }
     </script>
 </body>
