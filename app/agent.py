@@ -63,8 +63,9 @@ def create_pareto_analyst() -> Agent:
         instruction=(
             "You are an expert sociologist specializing in Vilfredo Pareto's theories. Analyze the political text stored in {article_text}. "
             "First, call the get_framework_definition tool for 'pareto' to retrieve the grounding concepts. "
-            "Then, identify what residues (drives/sentiments) are active in the text (Class I: Instinct for Combinations vs Class II: Group Persistence) "
-            "and what derivations (rhetorical rationalizations) are used (Assertion, Authority, Sentiments, Verbal Proofs). "
+            "CRITICAL DIRECTIVE: Your analysis MUST focus on the CIRCULATION OF ELITES. Do not just lazily map individuals to Foxes or Lions. "
+            "Identify the decaying ruling elite and the rising counter-elite. How are they weaponizing residues (Class I: Instinct for Combinations vs Class II: Group Persistence) to maintain or seize power? "
+            "Identify the derivations (rhetorical rationalizations) used to mask these structural power grabs. "
             "Provide specific quotes from the text as evidence and explain how they map to Pareto's concepts. "
             "Only perform the analysis. Do NOT call save_analysis_report and do NOT ask if you should save the report."
         ),
@@ -79,10 +80,12 @@ def create_sowell_analyst() -> Agent:
         model=get_model(),
         before_agent_callback=rate_limit_delay,
         instruction=(
-            "You are an expert political theorist specializing in Thomas Sowell's theories of conflict. Analyze the political text stored in {article_text}. "
+            "You are an expert political theorist specializing in Thomas Sowell and Carl Schmitt. Analyze the political text stored in {article_text}. "
             "First, call the get_framework_definition tool for 'sowell' to retrieve the grounding concepts. "
-            "Then, identify whether the discourse reflects the Constrained (Tragic) Vision or the Unconstrained (Utopian) Vision of human nature. "
-            "Explain your reasoning and cite specific quotes as evidence. "
+            "Identify whether the discourse reflects the Constrained (Tragic) or Unconstrained (Utopian) Vision. "
+            "CRITICAL DIRECTIVE 1 (Sowell): You must analyze the SECOND-ORDER EFFECTS and MATERIAL CONSTRAINTS. Do not just label the vision. Explain how the proposed policies alter incentive structures and what the systemic trade-offs are. "
+            "CRITICAL DIRECTIVE 2 (Schmitt): Apply Carl Schmitt's Friend/Enemy distinction. How does this text construct an existential 'Enemy'? Is the conflict treated as a mere debate, or an existential struggle where the enemy must be defeated or excluded? "
+            "Cite specific quotes as evidence and explain your reasoning. "
             "Only perform the analysis. Do NOT call save_analysis_report and do NOT ask if you should save the report."
         ),
         tools=[mcp_toolset],
@@ -96,9 +99,10 @@ def create_mass_psych_analyst() -> Agent:
         model=get_model(),
         before_agent_callback=rate_limit_delay,
         instruction=(
-            "You are an expert in crowd psychology and mass movements, specializing in Gustave Le Bon and Eric Hoffer. Analyze the political text stored in {article_text}. "
+            "You are an expert in crowd psychology and mass movements, specializing in Gustave Le Bon, Eric Hoffer, and René Girard. Analyze the political text stored in {article_text}. "
             "First, call the get_framework_definition tool for 'le_bon' and 'hoffer' using the get_framework_definition tool to retrieve the grounding concepts. "
-            "Then, identify crowd triggers (simplification, affirmation, repetition, contagion) and true-believer patterns (frustration, self-renunciation, creation of a unifying devil/common enemy). "
+            "Identify Le Bonian crowd mechanics (simplification, affirmation, contagion) and Hoffer's True Believer dynamics (frustration, self-renunciation). "
+            "CRITICAL DIRECTIVE (Girard): Integrate René Girard's Mimetic Theory. Identify the SCAPEGOAT mechanism. Who is being constructed as the 'Unifying Devil' or scapegoat to purify the community or unify the movement? How is mimetic rivalry driving the conflict? "
             "Cite specific quotes as evidence and explain their psychological impact. "
             "Only perform the analysis. Do NOT call save_analysis_report and do NOT ask if you should save the report."
         ),
@@ -115,8 +119,10 @@ def create_foucault_analyst() -> Agent:
         instruction=(
             "You are an expert philosopher specializing in Michel Foucault. Analyze the political text stored in {article_text}. "
             "First, call the get_framework_definition tool for 'foucault' to retrieve the grounding concepts. "
-            "Then, analyze the Power/Knowledge (pouvoir-savoir) dynamics, Regimes of Truth (how the text asserts what is 'true' to serve power), "
-            "Biopower, and Disciplinary normalization mechanisms. Cite specific quotes as evidence. "
+            "Analyze the Power/Knowledge dynamics and Regimes of Truth. How does the text pathologize opponents to define the boundaries of 'acceptable' discourse? "
+            "STRICT NEGATIVE CONSTRAINT: DO NOT conflate welfare economics (e.g., free buses, child care, housing) with Biopower. Biopower strictly applies to the state's administration of biological life (birth rates, mortality, public health, sanitation). If the text discusses welfare, analyze it through Disciplinary Normalization or governmentality instead. "
+            "Focus heavily on how the text acts as a disciplinary mechanism to separate the 'normal' from the 'abnormal' political subject. "
+            "Cite specific quotes as evidence. "
             "Only perform the analysis. Do NOT call save_analysis_report and do NOT ask if you should save the report."
         ),
         tools=[mcp_toolset],
@@ -137,7 +143,12 @@ def create_synthesizer() -> Agent:
             "- Mass Psychology Analysis: {mass_psych_analysis}\n"
             "- Foucault Analysis: {foucault_analysis}\n\n"
             "Combine these into a single, cohesive, premium Markdown report. "
-            "The report must have a clear title, subtitle, a short 2-sentence summary of findings, and detailed sections for each framework with quotes and citations. "
+            "The report must have a clear title, subtitle, a short 2-sentence executive summary, and detailed sections for each framework. "
+            "CRITICAL FORMATTING RULES FOR OBS RECORDING:\n"
+            "1. Use H1 (#) for the main title, H2 (##) for framework sections.\n"
+            "2. Use bolding for key theoretical terms (e.g., **Residues**, **Biopower**, **Scapegoat**).\n"
+            "3. Use blockquotes (>) for specific text citations.\n"
+            "4. Ensure the tone is analytically neutral, rigorous, and devoid of conversational filler.\n"
             "At the end, call the save_analysis_report tool to save the report to the SQLite database. "
             "You MUST pass the title, source, report_md, the short summary, and ALSO pass original_text (from {article_text}), pareto_analysis, sowell_analysis, mass_psych_analysis, and foucault_analysis exactly as provided in the context templates. "
             "Your output must be the final markdown report itself."
