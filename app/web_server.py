@@ -122,10 +122,9 @@ async def analyze_discourse(payload: AnalysisRequest):
                         end_idx = pos
                 summary = summary_text[:end_idx].strip()
                 break
-        
         if not summary:
             # Fallback: first two content lines
-            content_lines = [l.strip() for l in lines if l.strip() and not l.startswith(("#", ">", "*", "-"))]
+            content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
             if content_lines:
                 summary = " ".join(content_lines[:2])
                 if len(summary) > 200:
