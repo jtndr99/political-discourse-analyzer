@@ -1,4 +1,5 @@
 import os
+from pydantic import BaseModel
 
 from dotenv import load_dotenv
 from google.adk.agents import Agent, SequentialAgent
@@ -8,6 +9,12 @@ from google.genai import types
 
 from app.mcp_client import get_mcp_toolset
 from app.tools import fetch_web_page
+
+class SynthesisReport(BaseModel):
+    title: str
+    subtitle: str
+    summary: str
+    report_md: str
 
 # Load local environment variables from .env
 load_dotenv()
@@ -138,16 +145,20 @@ def create_synthesizer() -> Agent:
             "- Sowell Analysis: {sowell_analysis}\n"
             "- Mass Psychology Analysis: {mass_psych_analysis}\n"
             "- Foucault Analysis: {foucault_analysis}\n\n"
-            "Combine these into a single, cohesive, premium Markdown report. "
-            "The report must have a clear title, subtitle, a short 2-sentence executive summary, and detailed sections for each framework. "
-            "CRITICAL FORMATTING RULES FOR OBS RECORDING:\n"
-            "1. Use H1 (#) for the main title, H2 (##) for framework sections.\n"
+            "Combine these into a single, cohesive, premium JSON report conforming to the requested schema. "
+            "The JSON report must have the following fields:\n"
+            "- title: A clear, academic-grade title for the analysis.\n"
+            "- subtitle: A descriptive subtitle reflecting the main theme.\n"
+            "- summary: A short 2-sentence executive summary of the key findings.\n"
+            "- report_md: The detailed synthesized report in Markdown format containing sections for each framework.\n\n"
+            "CRITICAL FORMATTING RULES FOR report_md:\n"
+            "1. Use H2 (##) for framework sections.\n"
             "2. Use bolding for key theoretical terms (e.g., **Residues**, **Biopower**, **Scapegoat**).\n"
             "3. Use blockquotes (>) for specific text citations.\n"
-            "4. Ensure the tone is analytically neutral, rigorous, and devoid of conversational filler.\n"
-            "Your output must be the final markdown report itself."
+            "4. Ensure the tone is analytically neutral, rigorous, and devoid of conversational filler."
         ),
         output_key="final_report",
+        output_schema=SynthesisReport,
         generate_content_config=DEFAULT_GEN_CONFIG,
     )
 

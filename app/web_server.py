@@ -99,36 +99,66 @@ async def analyze_discourse(payload: AnalysisRequest):
             "foucault_analysis", "No Foucault analysis generated."
         )
 
-        # Programmatically parse title and summary from final_report
+        # Programmatically parse title, summary, and report_md from final_report
+        import json
         title = "Discourse Analysis"
         summary = ""
-        lines = final_report.strip().split("\n")
-        for line in lines:
-            if line.startswith("# "):
-                title = line[2:].strip().replace("*", "").replace("_", "")
-                break
+        report_md = "No final report generated."
 
-        lower_report = final_report.lower()
-        summary_idx = -1
-        for keyword in ["executive summary", "summary"]:
-            summary_idx = lower_report.find(keyword)
-            if summary_idx != -1:
-                summary_text = final_report[summary_idx + len(keyword):].strip()
-                summary_text = summary_text.lstrip(":- \t\r\n")
-                end_idx = len(summary_text)
-                for term in ["\n\n", "\n#", "\n*"]:
-                    pos = summary_text.find(term)
-                    if pos != -1 and pos < end_idx:
-                        end_idx = pos
-                summary = summary_text[:end_idx].strip()
-                break
-        if not summary:
-            # Fallback: first two content lines
-            content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
-            if content_lines:
-                summary = " ".join(content_lines[:2])
-                if len(summary) > 200:
-                    summary = summary[:197] + "..."
+        # Support dict (automatically parsed by ADK), Pydantic objects, and raw strings
+        if isinstance(final_report, dict):
+            title = final_report.get("title", title)
+            summary = final_report.get("summary", summary)
+            report_md = final_report.get("report_md", report_md)
+        elif hasattr(final_report, "model_dump"):
+            try:
+                report_dict = final_report.model_dump()
+                title = report_dict.get("title", title)
+                summary = report_dict.get("summary", summary)
+                report_md = report_dict.get("report_md", report_md)
+            except Exception as e:
+                logger.error(f"Failed to dump Pydantic model: {e}")
+        elif isinstance(final_report, str):
+            try:
+                # Attempt to parse final_report as a JSON object
+                report_data = json.loads(final_report)
+                title = report_data.get("title", title)
+                summary = report_data.get("summary", summary)
+                report_md = report_data.get("report_md", report_md)
+            except Exception as e:
+                logger.info(f"Synthesizer output is not JSON, treating as raw markdown: {e}")
+                # Fallback parsing logic for unstructured markdown output
+                report_md = final_report
+                lines = final_report.strip().split("\n")
+                for line in lines:
+                    if line.startswith("# "):
+                        title = line[2:].strip().replace("*", "").replace("_", "")
+                        break
+
+                lower_report = final_report.lower()
+                summary_idx = -1
+                for keyword in ["executive summary", "summary"]:
+                    summary_idx = lower_report.find(keyword)
+                    if summary_idx != -1:
+                        summary_text = final_report[summary_idx + len(keyword):].strip()
+                        summary_text = summary_text.lstrip(":- \t\r\n")
+                        end_idx = len(summary_text)
+                        for term in ["\n\n", "\n#", "\n*"]:
+                            pos = summary_text.find(term)
+                            if pos != -1 and pos < end_idx:
+                                end_idx = pos
+                        summary = summary_text[:end_idx].strip()
+                        break
+                if not summary:
+                    # Fallback: first two content lines
+                    content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
+                    if content_lines:
+                        summary = " ".join(content_lines[:2])
+                        if len(summary) > 200:
+                            summary = summary[:197] + "..."
+        else:
+            logger.warning(f"Unexpected type for final_report: {type(final_report)}")
+            report_md = str(final_report)
 
         # Save to SQLite database programmatically
         try:
@@ -139,7 +169,7 @@ async def analyze_discourse(payload: AnalysisRequest):
                 (
                     title,
                     input_text,
-                    final_report,
+                    report_md,
                     summary,
                     original_text,
                     pareto_analysis,
@@ -161,7 +191,7 @@ async def analyze_discourse(payload: AnalysisRequest):
             "sowell_analysis": sowell_analysis,
             "mass_psych_analysis": mass_psych_analysis,
             "foucault_analysis": foucault_analysis,
-            "final_report": final_report,
+            "final_report": report_md,
         }
 
         return JSONResponse(content=response_data)
