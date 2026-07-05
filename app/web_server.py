@@ -40,6 +40,55 @@ class AnalysisRequest(BaseModel):
     input_text: str
 
 
+def parse_analyst_output(output_raw):
+    """
+    Safely parses the analyst's output, which could be a parsed dictionary,
+    a Pydantic object, a JSON string, or legacy plain text markdown.
+    Returns a tuple of (analysis_md, metrics_dict).
+    """
+    import json
+    analysis_md = str(output_raw)
+    metrics = {}
+
+    if isinstance(output_raw, dict):
+        analysis_md = output_raw.get("analysis_md", analysis_md)
+        metrics = {k: v for k, v in output_raw.items() if k != "analysis_md"}
+    elif hasattr(output_raw, "model_dump"):
+        try:
+            output_dict = output_raw.model_dump()
+            analysis_md = output_dict.get("analysis_md", analysis_md)
+            metrics = {k: v for k, v in output_dict.items() if k != "analysis_md"}
+        except Exception as e:
+            logger.error(f"Failed to dump analyst Pydantic model: {e}")
+    elif isinstance(output_raw, str) and output_raw.strip():
+        # Try to parse as JSON first
+        try:
+            parsed = json.loads(output_raw)
+            if isinstance(parsed, dict):
+                analysis_md = parsed.get("analysis_md", analysis_md)
+                metrics = {k: v for k, v in parsed.items() if k != "analysis_md"}
+        except Exception:
+            # Not JSON, treat as raw markdown
+            pass
+    return analysis_md, metrics
+
+
+def get_db_value(raw_val):
+    """
+    Serializes raw values to a JSON string if they are dicts or Pydantic models.
+    Otherwise, returns the string representation as is.
+    """
+    import json
+    if isinstance(raw_val, dict):
+        return json.dumps(raw_val)
+    elif hasattr(raw_val, "model_dump"):
+        try:
+            return json.dumps(raw_val.model_dump())
+        except Exception:
+            pass
+    return str(raw_val)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard(request: Request):
     return templates.TemplateResponse(
@@ -90,14 +139,16 @@ async def analyze_discourse(payload: AnalysisRequest):
         # Build payload response
         final_report = state.get("final_report", "No final report generated.")
         original_text = state.get("article_text", input_text)
-        pareto_analysis = state.get("pareto_analysis", "No Pareto analysis generated.")
-        sowell_analysis = state.get("sowell_analysis", "No Sowell analysis generated.")
-        mass_psych_analysis = state.get(
-            "mass_psych_analysis", "No Mass Psychology analysis generated."
-        )
-        foucault_analysis = state.get(
-            "foucault_analysis", "No Foucault analysis generated."
-        )
+        
+        pareto_raw = state.get("pareto_analysis", "")
+        sowell_raw = state.get("sowell_analysis", "")
+        mass_psych_raw = state.get("mass_psych_analysis", "")
+        foucault_raw = state.get("foucault_analysis", "")
+
+        pareto_md, pareto_metrics = parse_analyst_output(pareto_raw)
+        sowell_md, sowell_metrics = parse_analyst_output(sowell_raw)
+        mass_psych_md, mass_psych_metrics = parse_analyst_output(mass_psych_raw)
+        foucault_md, foucault_metrics = parse_analyst_output(foucault_raw)
 
         # Programmatically parse title, summary, and report_md from final_report
         import json
@@ -172,10 +223,10 @@ async def analyze_discourse(payload: AnalysisRequest):
                     report_md,
                     summary,
                     original_text,
-                    pareto_analysis,
-                    sowell_analysis,
-                    mass_psych_analysis,
-                    foucault_analysis,
+                    get_db_value(pareto_raw),
+                    get_db_value(sowell_raw),
+                    get_db_value(mass_psych_raw),
+                    get_db_value(foucault_raw),
                 ),
             )
             conn.commit()
@@ -187,11 +238,15 @@ async def analyze_discourse(payload: AnalysisRequest):
         response_data = {
             "session_id": session_id,
             "article_text": original_text,
-            "pareto_analysis": pareto_analysis,
-            "sowell_analysis": sowell_analysis,
-            "mass_psych_analysis": mass_psych_analysis,
-            "foucault_analysis": foucault_analysis,
+            "pareto_analysis": pareto_md,
+            "sowell_analysis": sowell_md,
+            "mass_psych_analysis": mass_psych_md,
+            "foucault_analysis": foucault_md,
             "final_report": report_md,
+            "pareto_metrics": pareto_metrics,
+            "sowell_metrics": sowell_metrics,
+            "mass_psych_metrics": mass_psych_metrics,
+            "foucault_metrics": foucault_metrics,
         }
 
         return JSONResponse(content=response_data)
@@ -243,6 +298,16 @@ async def get_report(report_id: int):
         if not row:
             raise HTTPException(status_code=404, detail="Report not found")
 
+        pareto_db = row[7] or ""
+        sowell_db = row[8] or ""
+        mass_psych_db = row[9] or ""
+        foucault_db = row[10] or ""
+
+        pareto_md, pareto_metrics = parse_analyst_output(pareto_db)
+        sowell_md, sowell_metrics = parse_analyst_output(sowell_db)
+        mass_psych_md, mass_psych_metrics = parse_analyst_output(mass_psych_db)
+        foucault_md, foucault_metrics = parse_analyst_output(foucault_db)
+
         report = {
             "id": row[0],
             "title": row[1],
@@ -251,10 +316,14 @@ async def get_report(report_id: int):
             "summary": row[4],
             "created_at": row[5],
             "original_text": row[6] or "",
-            "pareto_analysis": row[7] or "",
-            "sowell_analysis": row[8] or "",
-            "mass_psych_analysis": row[9] or "",
-            "foucault_analysis": row[10] or "",
+            "pareto_analysis": pareto_md,
+            "sowell_analysis": sowell_md,
+            "mass_psych_analysis": mass_psych_md,
+            "foucault_analysis": foucault_md,
+            "pareto_metrics": pareto_metrics,
+            "sowell_metrics": sowell_metrics,
+            "mass_psych_metrics": mass_psych_metrics,
+            "foucault_metrics": foucault_metrics,
         }
         return JSONResponse(content=report)
     except Exception as e:

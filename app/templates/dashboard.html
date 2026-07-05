@@ -1423,44 +1423,51 @@
         // Populate visualizer widgets dynamically by scanning analysis contents
         function updateVisualizers(data) {
             // 1. Sowell Tab Visualizer
-            const sowellText = (data.sowell_analysis || "").toLowerCase();
-            
-            const unconstrainedTerms = ['unconstrained', 'utopian', 'perfectible', 'expert', 'planning', 'expert decision-making', 'social engineering'];
-            const constrainedTerms = ['constrained', 'tragic', 'trade-offs', 'trade-off', 'rule of law', 'traditions', 'evolved institutions', 'systemic process'];
-            
-            let unconstrainedCount = 0;
-            let constrainedCount = 0;
-            
-            unconstrainedTerms.forEach(term => {
-                const regex = new RegExp(term, 'g');
-                const matches = sowellText.match(regex);
-                if (matches) unconstrainedCount += matches.length;
-            });
-            
-            constrainedTerms.forEach(term => {
-                const regex = new RegExp(term, 'g');
-                const matches = sowellText.match(regex);
-                if (matches) constrainedCount += matches.length;
-            });
-            
             let visionScore = 50;
-            const totalVisionTerms = unconstrainedCount + constrainedCount;
-            if (totalVisionTerms > 0) {
-                visionScore = Math.round((unconstrainedCount / totalVisionTerms) * 100);
+            let schmittIntensity = 15;
+
+            if (data.sowell_metrics && typeof data.sowell_metrics.unconstrained_score !== 'undefined') {
+                visionScore = data.sowell_metrics.unconstrained_score;
+                schmittIntensity = data.sowell_metrics.schmitt_intensity;
+            } else {
+                const sowellText = (data.sowell_analysis || "").toLowerCase();
+                
+                const unconstrainedTerms = ['unconstrained', 'utopian', 'perfectible', 'expert', 'planning', 'expert decision-making', 'social engineering'];
+                const constrainedTerms = ['constrained', 'tragic', 'trade-offs', 'trade-off', 'rule of law', 'traditions', 'evolved institutions', 'systemic process'];
+                
+                let unconstrainedCount = 0;
+                let constrainedCount = 0;
+                
+                unconstrainedTerms.forEach(term => {
+                    const regex = new RegExp(term, 'g');
+                    const matches = sowellText.match(regex);
+                    if (matches) unconstrainedCount += matches.length;
+                });
+                
+                constrainedTerms.forEach(term => {
+                    const regex = new RegExp(term, 'g');
+                    const matches = sowellText.match(regex);
+                    if (matches) constrainedCount += matches.length;
+                });
+                
+                const totalVisionTerms = unconstrainedCount + constrainedCount;
+                if (totalVisionTerms > 0) {
+                    visionScore = Math.round((unconstrainedCount / totalVisionTerms) * 100);
+                }
+                
+                // Schmitt Friend/Enemy Intensity
+                const schmittTerms = ['friend/enemy', 'enemy', 'existential', 'struggle', 'defeat', 'exclusion', 'conflict', 'political enemy', 'adversary'];
+                let schmittCount = 0;
+                schmittTerms.forEach(term => {
+                    const regex = new RegExp(term, 'g');
+                    const matches = sowellText.match(regex);
+                    if (matches) schmittCount += matches.length;
+                });
+                
+                schmittIntensity = Math.min(100, Math.round(schmittCount * 12));
+                if (sowellText.includes('friend/enemy')) schmittIntensity = Math.max(schmittIntensity, 50);
+                if (schmittIntensity === 0 && sowellText.length > 10) schmittIntensity = 15;
             }
-            
-            // Schmitt Friend/Enemy Intensity
-            const schmittTerms = ['friend/enemy', 'enemy', 'existential', 'struggle', 'defeat', 'exclusion', 'conflict', 'political enemy', 'adversary'];
-            let schmittCount = 0;
-            schmittTerms.forEach(term => {
-                const regex = new RegExp(term, 'g');
-                const matches = sowellText.match(regex);
-                if (matches) schmittCount += matches.length;
-            });
-            
-            let schmittIntensity = Math.min(100, Math.round(schmittCount * 12));
-            if (sowellText.includes('friend/enemy')) schmittIntensity = Math.max(schmittIntensity, 50);
-            if (schmittIntensity === 0 && sowellText.length > 10) schmittIntensity = 15;
 
             const sowellPanel = document.getElementById("visualizer-sowell");
             sowellPanel.innerHTML = `
@@ -1495,44 +1502,62 @@
             `;
 
             // 2. Pareto Tab Visualizer
-            const paretoText = (data.pareto_analysis || "").toLowerCase();
-            
-            const classITerms = ['class i', 'combinations', 'fox', 'foxes', 'cunning', 'innovation', 'persuasion', 'inventiveness'];
-            const classIITerms = ['class ii', 'persistence', 'lion', 'lions', 'force', 'tradition', 'loyalty', 'conservative'];
-            
-            let classICount = 0;
-            let classIICount = 0;
-            
-            classITerms.forEach(term => {
-                const regex = new RegExp(term, 'g');
-                const matches = paretoText.match(regex);
-                if (matches) classICount += matches.length;
-            });
-            
-            classIITerms.forEach(term => {
-                const regex = new RegExp(term, 'g');
-                const matches = paretoText.match(regex);
-                if (matches) classIICount += matches.length;
-            });
-            
             let paretoScore = 50;
-            const totalParetoTerms = classICount + classIICount;
-            if (totalParetoTerms > 0) {
-                paretoScore = Math.round((classICount / totalParetoTerms) * 100);
-            }
-            
-            const derivations = {
-                assertion: ['assertion', 'dogma', 'dogmatic', 'asserting'],
-                authority: ['authority', 'prestige', 'expert', 'respected', 'constitution', 'sacred'],
-                sentiment: ['sentiment', 'principles', 'morals', 'fairness', 'justice', 'rightness'],
-                sophistry: ['verbal proof', 'sophistry', 'verbal sophistry', 'wordplay', 'vague', 'metaphor']
+            const activeDerivations = {
+                assertion: false,
+                authority: false,
+                sentiment: false,
+                sophistry: false
             };
-            
-            const activeDerivations = {};
-            Object.keys(derivations).forEach(key => {
-                activeDerivations[key] = derivations[key].some(term => paretoText.includes(term));
-            });
-            
+
+            if (data.pareto_metrics && typeof data.pareto_metrics.fox_drive_score !== 'undefined') {
+                paretoScore = data.pareto_metrics.fox_drive_score;
+                const detected = data.pareto_metrics.derivations_detected || [];
+                detected.forEach(d => {
+                    const dLower = d.toLowerCase();
+                    if (dLower.includes('assertion')) activeDerivations.assertion = true;
+                    if (dLower.includes('authority')) activeDerivations.authority = true;
+                    if (dLower.includes('sentiment') || dLower.includes('accord')) activeDerivations.sentiment = true;
+                    if (dLower.includes('sophistry') || dLower.includes('verbal')) activeDerivations.sophistry = true;
+                });
+            } else {
+                const paretoText = (data.pareto_analysis || "").toLowerCase();
+                
+                const classITerms = ['class i', 'combinations', 'fox', 'foxes', 'cunning', 'innovation', 'persuasion', 'inventiveness'];
+                const classIITerms = ['class ii', 'persistence', 'lion', 'lions', 'force', 'tradition', 'loyalty', 'conservative'];
+                
+                let classICount = 0;
+                let classIICount = 0;
+                
+                classITerms.forEach(term => {
+                    const regex = new RegExp(term, 'g');
+                    const matches = paretoText.match(regex);
+                    if (matches) classICount += matches.length;
+                });
+                
+                classIITerms.forEach(term => {
+                    const regex = new RegExp(term, 'g');
+                    const matches = paretoText.match(regex);
+                    if (matches) classIICount += matches.length;
+                });
+                
+                const totalParetoTerms = classICount + classIICount;
+                if (totalParetoTerms > 0) {
+                    paretoScore = Math.round((classICount / totalParetoTerms) * 100);
+                }
+                
+                const derivations = {
+                    assertion: ['assertion', 'dogma', 'dogmatic', 'asserting'],
+                    authority: ['authority', 'prestige', 'expert', 'respected', 'constitution', 'sacred'],
+                    sentiment: ['sentiment', 'principles', 'morals', 'fairness', 'justice', 'rightness'],
+                    sophistry: ['verbal proof', 'sophistry', 'verbal sophistry', 'wordplay', 'vague', 'metaphor']
+                };
+                
+                Object.keys(derivations).forEach(key => {
+                    activeDerivations[key] = derivations[key].some(term => paretoText.includes(term));
+                });
+            }
+
             const paretoPanel = document.getElementById("visualizer-pareto");
             paretoPanel.innerHTML = `
                 <div class="visualizer-row">
@@ -1562,29 +1587,37 @@
             `;
 
             // 3. Mass Psychology (Girard/Hoffer/Le Bon) Visualizer
-            const massText = (data.mass_psych_analysis || "").toLowerCase();
-            
-            const mimeticTerms = ['mimetic', 'rivalry', 'desire', 'competition', 'imitation', 'model', 'mimetic rivalry'];
-            let mimeticCount = 0;
-            mimeticTerms.forEach(term => {
-                const regex = new RegExp(term, 'g');
-                const matches = massText.match(regex);
-                if (matches) mimeticCount += matches.length;
-            });
-            let mimeticScore = Math.min(100, Math.round(mimeticCount * 15));
-            if (massText.includes('mimetic rivalry')) mimeticScore = Math.max(mimeticScore, 50);
-            if (mimeticScore === 0 && massText.length > 10) mimeticScore = 20;
+            let mimeticScore = 20;
+            let scapegoatScore = 15;
 
-            const scapegoatTerms = ['scapegoat', 'unifying devil', 'devil', 'enemy', 'unify', 'purify', 'scapegoating'];
-            let scapegoatCount = 0;
-            scapegoatTerms.forEach(term => {
-                const regex = new RegExp(term, 'g');
-                const matches = massText.match(regex);
-                if (matches) scapegoatCount += matches.length;
-            });
-            let scapegoatScore = Math.min(100, Math.round(scapegoatCount * 14));
-            if (massText.includes('scapegoat') || massText.includes('unifying devil')) scapegoatScore = Math.max(scapegoatScore, 55);
-            if (scapegoatScore === 0 && massText.length > 10) scapegoatScore = 15;
+            if (data.mass_psych_metrics && typeof data.mass_psych_metrics.mimetic_tension !== 'undefined') {
+                mimeticScore = data.mass_psych_metrics.mimetic_tension;
+                scapegoatScore = data.mass_psych_metrics.scapegoat_index;
+            } else {
+                const massText = (data.mass_psych_analysis || "").toLowerCase();
+                
+                const mimeticTerms = ['mimetic', 'rivalry', 'desire', 'competition', 'imitation', 'model', 'mimetic rivalry'];
+                let mimeticCount = 0;
+                mimeticTerms.forEach(term => {
+                    const regex = new RegExp(term, 'g');
+                    const matches = massText.match(regex);
+                    if (matches) mimeticCount += matches.length;
+                });
+                mimeticScore = Math.min(100, Math.round(mimeticCount * 15));
+                if (massText.includes('mimetic rivalry')) mimeticScore = Math.max(mimeticScore, 50);
+                if (mimeticScore === 0 && massText.length > 10) mimeticScore = 20;
+
+                const scapegoatTerms = ['scapegoat', 'unifying devil', 'devil', 'enemy', 'unify', 'purify', 'scapegoating'];
+                let scapegoatCount = 0;
+                scapegoatTerms.forEach(term => {
+                    const regex = new RegExp(term, 'g');
+                    const matches = massText.match(regex);
+                    if (matches) scapegoatCount += matches.length;
+                });
+                scapegoatScore = Math.min(100, Math.round(scapegoatCount * 14));
+                if (massText.includes('scapegoat') || massText.includes('unifying devil')) scapegoatScore = Math.max(scapegoatScore, 55);
+                if (scapegoatScore === 0 && massText.length > 10) scapegoatScore = 15;
+            }
 
             const massPanel = document.getElementById("visualizer-mass_psych");
             massPanel.innerHTML = `
@@ -1619,20 +1652,38 @@
             `;
 
             // 4. Foucault Tab Visualizer
-            const foucaultText = (data.foucault_analysis || "").toLowerCase();
-            
-            const powerMechanisms = {
-                truthRegime: ['regime of truth', 'regimes of truth', 'truth', 'discourse', 'acceptable'],
-                normalization: ['disciplinary', 'discipline', 'surveillance', 'normalization', 'normal', 'abnormal'],
-                biopower: ['biopower', 'biopolitics', 'biological', 'population', 'mortality', 'sanitation'],
-                governmentality: ['governmentality', 'governing', 'conduct'],
-                pathologization: ['pathology', 'pathologize', 'pathologizing', 'abnormal', 'unacceptable']
+            const activeMechanisms = {
+                truthRegime: false,
+                normalization: false,
+                biopower: false,
+                governmentality: false,
+                pathologization: false
             };
-            
-            const activeMechanisms = {};
-            Object.keys(powerMechanisms).forEach(key => {
-                activeMechanisms[key] = powerMechanisms[key].some(term => foucaultText.includes(term));
-            });
+
+            if (data.foucault_metrics && data.foucault_metrics.mechanisms_detected) {
+                const mechanisms = data.foucault_metrics.mechanisms_detected || [];
+                mechanisms.forEach(m => {
+                    if (m === 'truthRegime' || m.toLowerCase().includes('truth')) activeMechanisms.truthRegime = true;
+                    if (m === 'normalization' || m.toLowerCase().includes('normal')) activeMechanisms.normalization = true;
+                    if (m === 'biopower' || m.toLowerCase().includes('bio')) activeMechanisms.biopower = true;
+                    if (m === 'governmentality' || m.toLowerCase().includes('govern')) activeMechanisms.governmentality = true;
+                    if (m === 'pathologization' || m.toLowerCase().includes('patho')) activeMechanisms.pathologization = true;
+                });
+            } else {
+                const foucaultText = (data.foucault_analysis || "").toLowerCase();
+                
+                const powerMechanisms = {
+                    truthRegime: ['regime of truth', 'regimes of truth', 'truth', 'discourse', 'acceptable'],
+                    normalization: ['disciplinary', 'discipline', 'surveillance', 'normalization', 'normal', 'abnormal'],
+                    biopower: ['biopower', 'biopolitics', 'biological', 'population', 'mortality', 'sanitation'],
+                    governmentality: ['governmentality', 'governing', 'conduct'],
+                    pathologization: ['pathology', 'pathologize', 'pathologizing', 'abnormal', 'unacceptable']
+                };
+                
+                Object.keys(powerMechanisms).forEach(key => {
+                    activeMechanisms[key] = powerMechanisms[key].some(term => foucaultText.includes(term));
+                });
+            }
 
             const foucaultPanel = document.getElementById("visualizer-foucault");
             foucaultPanel.innerHTML = `
