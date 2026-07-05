@@ -1,5 +1,8 @@
+import asyncio
 import logging
+import os
 import re
+import time
 
 from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
@@ -93,8 +96,50 @@ class ContentGuardrailPlugin(BasePlugin):
         return None
 
 
+class RateLimiterPlugin(BasePlugin):
+    """Proactively throttles requests to Gemini to prevent hitting API rate limits using a Token Bucket."""
+
+    def __init__(self, requests_per_minute: float = 15.0):
+        super().__init__(name="rate_limiter")
+        self.capacity = requests_per_minute
+        self.fill_rate = requests_per_minute / 60.0  # tokens per second
+        self.tokens = requests_per_minute
+        self.last_update = time.monotonic()
+        self.lock = asyncio.Lock()
+
+    async def before_model_callback(self, *, callback_context, llm_request):
+        async with self.lock:
+            now = time.monotonic()
+            elapsed = now - self.last_update
+            self.last_update = now
+
+            # Add tokens based on elapsed time
+            self.tokens = min(self.capacity, self.tokens + elapsed * self.fill_rate)
+
+            if self.tokens < 1.0:
+                # Calculate time to wait until we have at least 1 token
+                wait_time = (1.0 - self.tokens) / self.fill_rate
+                logger.info(f"RateLimiterPlugin: Throttling model request. Sleeping for {wait_time:.2f} seconds...")
+                await asyncio.sleep(wait_time)
+                
+                # Update tokens after sleeping
+                now_after_sleep = time.monotonic()
+                elapsed_sleep = now_after_sleep - self.last_update
+                self.last_update = now_after_sleep
+                self.tokens = min(self.capacity, self.tokens + elapsed_sleep * self.fill_rate)
+
+            # Consume a token
+            self.tokens -= 1.0
+            logger.info(f"RateLimiterPlugin: Request allowed. Tokens remaining: {self.tokens:.2f}/{self.capacity}")
+            return None
+
+
+# Load RPM limit from environment (default is 15 RPM for free tier)
+gemini_rpm_limit = float(os.getenv("GEMINI_RPM_LIMIT", "15"))
+
 # Register plugins on the app
 app.plugins.append(PIIRedactorPlugin())
 app.plugins.append(ContentGuardrailPlugin())
+app.plugins.append(RateLimiterPlugin(requests_per_minute=gemini_rpm_limit))
 
 __all__ = ["app"]
