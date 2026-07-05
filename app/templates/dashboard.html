@@ -62,6 +62,7 @@
             height: 100vh;
             flex-shrink: 0;
             z-index: 10;
+            transition: var(--transition);
         }
 
         .sidebar-header {
@@ -664,6 +665,218 @@
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
+
+        /* --- COLLAPSIBLE SIDEBAR --- */
+        body.sidebar-collapsed .sidebar {
+            width: 0;
+            border-right-width: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .toggle-sidebar-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 20px;
+            padding: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toggle-sidebar-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-indigo);
+            color: var(--accent-indigo);
+        }
+
+        /* --- DELETE HISTORY BUTTON --- */
+        .delete-history-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 6px;
+            border-radius: 6px;
+            transition: var(--transition);
+            opacity: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .history-item:hover .delete-history-btn {
+            opacity: 1;
+        }
+        .delete-history-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        /* --- EXPORT REPORT BUTTONS --- */
+        .report-actions {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            display: flex;
+            gap: 8px;
+            z-index: 5;
+        }
+        
+        .action-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 16px;
+            padding: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .action-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .action-btn.copied {
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        /* --- ANALYTICAL VISUALIZERS --- */
+        .visualizer-panel {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .visualizer-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .visualizer-card-mini {
+            flex: 1;
+            min-width: 260px;
+            background: rgba(10, 15, 30, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .visualizer-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .gauge-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .gauge-track {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            border-radius: 4px;
+            width: 0%;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .gauge-pointer {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #ffffff;
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            transition: left 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .gauge-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            letter-spacing: 0.2px;
+        }
+
+        .gauge-value-display {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-top: 4px;
+        }
+
+        .badge-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .visualizer-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            transition: var(--transition);
+        }
+
+        .visualizer-badge.active.cyan {
+            background: rgba(6, 182, 212, 0.12);
+            border-color: rgba(6, 182, 212, 0.4);
+            color: #22d3ee;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.1);
+        }
+
+        .visualizer-badge.active.pink {
+            background: rgba(236, 72, 153, 0.12);
+            border-color: rgba(236, 72, 153, 0.4);
+            color: #f472b6;
+            box-shadow: 0 0 10px rgba(236, 72, 153, 0.1);
+        }
+
+        .visualizer-badge.active.indigo {
+            background: rgba(99, 102, 241, 0.12);
+            border-color: rgba(99, 102, 241, 0.4);
+            color: #818cf8;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -688,9 +901,14 @@
     <!-- Main Panel -->
     <div class="main-panel">
         <div class="header">
-            <div class="header-info">
-                <h2>Political Discourse Analyzer</h2>
-                <p>Deconstruct political speech and articles through five classical sociology & philosophy frameworks</p>
+            <div class="header-info" style="display: flex; align-items: center; gap: 16px;">
+                <button class="toggle-sidebar-btn" id="toggleSidebarBtn" onclick="toggleSidebar()" title="Toggle Sidebar">
+                    <i class="bx bx-menu-alt-left"></i>
+                </button>
+                <div>
+                    <h2>Political Discourse Analyzer</h2>
+                    <p>Deconstruct political speech and articles through five classical sociology & philosophy frameworks</p>
+                </div>
             </div>
             <div>
                 <!-- Extra top actions if needed -->
@@ -761,9 +979,17 @@
                 </div>
 
                 <div class="tabs-content-wrapper">
-                    <button class="copy-report-btn" id="copyReportBtn" onclick="copyReportToClipboard()" title="Copy Markdown Report">
-                        <i class="bx bx-copy"></i>
-                    </button>
+                    <div class="report-actions">
+                        <button class="action-btn" id="copyReportBtn" onclick="copyReportToClipboard()" title="Copy Markdown Report">
+                            <i class="bx bx-copy"></i>
+                        </button>
+                        <button class="action-btn" onclick="exportMarkdown()" title="Download Markdown (.md)">
+                            <i class="bx bx-download"></i>
+                        </button>
+                        <button class="action-btn" onclick="exportHTML()" title="Download Styled HTML">
+                            <i class="bx bx-file-html"></i>
+                        </button>
+                    </div>
                     <div class="tabs-content">
                     <!-- Final Synthesis -->
                     <div class="tab-pane active markdown-body" id="tabContent-final">
@@ -774,6 +1000,7 @@
                         <div class="framework-summary pareto">
                             <strong>Vilfredo Pareto's Lens:</strong> Explores the non-rational instincts (Residues) driving the speech and the rhetorical facades (Derivations) used to justify them. Look for Class I (Combinations/persuasion) vs Class II (Group loyalty/tradition/force) residues, and derivations appealing to authority, assertion, sentiments, or verbal sophistry.
                         </div>
+                        <div class="visualizer-panel" id="visualizer-pareto"></div>
                         <div class="markdown-body" id="tabMarkdown-pareto"></div>
                     </div>
                     <!-- Sowell -->
@@ -781,6 +1008,7 @@
                         <div class="framework-summary sowell">
                             <strong>Thomas Sowell's Lens:</strong> Evaluates whether the discourse assumes a <em>Constrained (Tragic) Vision</em> of human nature (humanity is limited; we must make trade-offs using systemic rules and traditions) or an <em>Unconstrained (Utopian) Vision</em> (humanity is perfectible; problems can be solved directly by reason and expert planners).
                         </div>
+                        <div class="visualizer-panel" id="visualizer-sowell"></div>
                         <div class="markdown-body" id="tabMarkdown-sowell"></div>
                     </div>
                     <!-- Mass Psych -->
@@ -788,6 +1016,7 @@
                         <div class="framework-summary mass_psych">
                             <strong>Gustave Le Bon & Eric Hoffer's Lens:</strong> Highlights crowd suggestibility, contagion, absolute affirmation, and repetition (Le Bon). Maps the True Believer psychology—frustration, self-renunciation, escape into a holy collective, and the manufacture of a unifying common devil or enemy (Hoffer).
                         </div>
+                        <div class="visualizer-panel" id="visualizer-mass_psych"></div>
                         <div class="markdown-body" id="tabMarkdown-mass_psych"></div>
                     </div>
                     <!-- Foucault -->
@@ -795,6 +1024,7 @@
                         <div class="framework-summary foucault">
                             <strong>Michel Foucault's Lens:</strong> Analyzes the linkages of <em>Power and Knowledge (pouvoir-savoir)</em>. Investigates the Regimes of Truth constructed to make certain truth claims function as authoritative, and checks for biopolitical regulation (governing population metrics) or disciplinary/surveillance normalization mechanisms.
                         </div>
+                        <div class="visualizer-panel" id="visualizer-foucault"></div>
                         <div class="markdown-body" id="tabMarkdown-foucault"></div>
                     </div>
                 </div>
@@ -841,7 +1071,12 @@
                     const sourceIcon = item.source.startsWith("http") ? "bx-link" : "bx-paste";
                     
                     div.innerHTML = `
-                        <div class="history-title">${item.title}</div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                            <div class="history-title" style="flex: 1;">${item.title}</div>
+                            <button class="delete-history-btn" onclick="deleteHistory(event, ${item.id})" title="Delete Report">
+                                <i class="bx bx-trash"></i>
+                            </button>
+                        </div>
                         <div class="history-meta">
                             <span class="history-source"><i class="bx ${sourceIcon}"></i> ${sourceText}</span>
                             <span>${date}</span>
@@ -969,6 +1204,7 @@
             document.getElementById("tabMarkdown-mass_psych").innerHTML = marked.parse(data.mass_psych_analysis);
             document.getElementById("tabMarkdown-foucault").innerHTML = marked.parse(data.foucault_analysis);
             
+            updateVisualizers(data);
             switchTab('final');
         }
 
@@ -999,6 +1235,7 @@
                 document.getElementById("tabMarkdown-mass_psych").innerHTML = report.mass_psych_analysis ? marked.parse(report.mass_psych_analysis) : "<p>No Mass Psychology analysis saved for this report.</p>";
                 document.getElementById("tabMarkdown-foucault").innerHTML = report.foucault_analysis ? marked.parse(report.foucault_analysis) : "<p>No Foucault analysis saved for this report.</p>";
                 
+                updateVisualizers(report);
                 switchTab('final');
             } catch (e) {
                 alert("Failed to load saved report: " + e.message);
@@ -1055,6 +1292,364 @@
                 console.error("Failed to copy text: ", err);
                 alert("Failed to copy report to clipboard.");
             }
+        }
+
+        // Toggle Sidebar collapsed state
+        function toggleSidebar() {
+            document.body.classList.toggle("sidebar-collapsed");
+        }
+
+        // Delete Report
+        async function deleteHistory(event, id) {
+            event.stopPropagation();
+            if (!confirm("Are you sure you want to delete this analysis report?")) return;
+            try {
+                const res = await fetch(`/history/${id}`, {
+                    method: "DELETE"
+                });
+                if (!res.ok) throw new Error("Failed to delete report from database");
+                
+                // If the deleted report is active, reset dashboard
+                const activeItem = document.getElementById(`history-item-${id}`);
+                if (activeItem && activeItem.classList.contains("active")) {
+                    resetDashboard();
+                }
+                
+                loadHistory();
+            } catch (e) {
+                alert("Error deleting report: " + e.message);
+            }
+        }
+
+        // Export Report as Markdown
+        function exportMarkdown() {
+            if (!currentMarkdownReport) return;
+            const blob = new Blob([currentMarkdownReport], { type: "text/markdown;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            
+            let filename = "discourse-analysis.md";
+            const titleEl = document.querySelector("#tabContent-final h1");
+            if (titleEl) {
+                filename = titleEl.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".md";
+            }
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Export Report as Styled HTML
+        function exportHTML() {
+            if (!currentMarkdownReport) return;
+            let title = "Discourse Analysis Report";
+            const titleEl = document.querySelector("#tabContent-final h1");
+            if (titleEl) {
+                title = titleEl.textContent.trim();
+            }
+            
+            const reportHtml = marked.parse(currentMarkdownReport);
+            const styles = `
+                body {
+                    font-family: 'Inter', sans-serif;
+                    background-color: #0b0f19;
+                    color: #f3f4f6;
+                    line-height: 1.8;
+                    padding: 40px;
+                    max-width: 800px;
+                    margin: 0 auto;
+                }
+                h1, h2, h3 {
+                    font-family: 'Outfit', sans-serif;
+                    color: #ffffff;
+                    margin-top: 24px;
+                    margin-bottom: 16px;
+                }
+                h1 { font-size: 28px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 12px; }
+                h2 { font-size: 22px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 8px; margin-top: 36px; }
+                h3 { font-size: 18px; }
+                p { margin-bottom: 16px; color: rgba(243, 244, 246, 0.9); }
+                ul, ol { margin-bottom: 16px; padding-left: 24px; }
+                li { margin-bottom: 8px; }
+                blockquote {
+                    border-left: 4px solid #6366f1;
+                    padding: 8px 20px;
+                    background: rgba(255, 255, 255, 0.03);
+                    border-radius: 0 8px 8px 0;
+                    margin-bottom: 16px;
+                    font-style: italic;
+                    color: #9ca3af;
+                }
+                code {
+                    background: rgba(255, 255, 255, 0.08);
+                    padding: 3px 6px;
+                    border-radius: 4px;
+                    font-family: monospace;
+                    font-size: 13px;
+                }
+                strong { color: #a855f7; }
+            `;
+            
+            const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>${styles}</style>
+</head>
+<body>
+    ${reportHtml}
+</body>
+</html>`;
+
+            const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            
+            let filename = "discourse-analysis.html";
+            if (titleEl) {
+                filename = titleEl.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".html";
+            }
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Populate visualizer widgets dynamically by scanning analysis contents
+        function updateVisualizers(data) {
+            // 1. Sowell Tab Visualizer
+            const sowellText = (data.sowell_analysis || "").toLowerCase();
+            
+            const unconstrainedTerms = ['unconstrained', 'utopian', 'perfectible', 'expert', 'planning', 'expert decision-making', 'social engineering'];
+            const constrainedTerms = ['constrained', 'tragic', 'trade-offs', 'trade-off', 'rule of law', 'traditions', 'evolved institutions', 'systemic process'];
+            
+            let unconstrainedCount = 0;
+            let constrainedCount = 0;
+            
+            unconstrainedTerms.forEach(term => {
+                const regex = new RegExp(term, 'g');
+                const matches = sowellText.match(regex);
+                if (matches) unconstrainedCount += matches.length;
+            });
+            
+            constrainedTerms.forEach(term => {
+                const regex = new RegExp(term, 'g');
+                const matches = sowellText.match(regex);
+                if (matches) constrainedCount += matches.length;
+            });
+            
+            let visionScore = 50;
+            const totalVisionTerms = unconstrainedCount + constrainedCount;
+            if (totalVisionTerms > 0) {
+                visionScore = Math.round((unconstrainedCount / totalVisionTerms) * 100);
+            }
+            
+            // Schmitt Friend/Enemy Intensity
+            const schmittTerms = ['friend/enemy', 'enemy', 'existential', 'struggle', 'defeat', 'exclusion', 'conflict', 'political enemy', 'adversary'];
+            let schmittCount = 0;
+            schmittTerms.forEach(term => {
+                const regex = new RegExp(term, 'g');
+                const matches = sowellText.match(regex);
+                if (matches) schmittCount += matches.length;
+            });
+            
+            let schmittIntensity = Math.min(100, Math.round(schmittCount * 12));
+            if (sowellText.includes('friend/enemy')) schmittIntensity = Math.max(schmittIntensity, 50);
+            if (schmittIntensity === 0 && sowellText.length > 10) schmittIntensity = 15;
+
+            const sowellPanel = document.getElementById("visualizer-sowell");
+            sowellPanel.innerHTML = `
+                <div class="visualizer-row">
+                    <div class="visualizer-card-mini">
+                        <div class="visualizer-title"><i class="bx bx-slider"></i> Sowell's Political Vision spectrum</div>
+                        <div class="gauge-container">
+                            <div class="gauge-track">
+                                <div class="gauge-pointer" style="left: ${visionScore}%; background: #ffffff; border: 3px solid var(--accent-purple); box-shadow: 0 0 10px rgba(168, 85, 247, 0.8);"></div>
+                            </div>
+                            <div class="gauge-labels">
+                                <span>CONSTRAINED (TRAGIC)</span>
+                                <span>UNCONSTRAINED (UTOPIAN)</span>
+                            </div>
+                            <div class="gauge-value-display">${visionScore}% Unconstrained</div>
+                        </div>
+                    </div>
+                    <div class="visualizer-card-mini">
+                        <div class="visualizer-title"><i class="bx bx-shield-quarter"></i> Schmitt existential intensity</div>
+                        <div class="gauge-container">
+                            <div class="gauge-track">
+                                <div class="gauge-fill" style="width: ${schmittIntensity}%; background: linear-gradient(90deg, #a855f7 0%, #ef4444 100%);"></div>
+                            </div>
+                            <div class="gauge-labels">
+                                <span>DEBATE / COMMERCE</span>
+                                <span>EXISTENTIAL STRUGGLE</span>
+                            </div>
+                            <div class="gauge-value-display">${schmittIntensity}% Intensity</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 2. Pareto Tab Visualizer
+            const paretoText = (data.pareto_analysis || "").toLowerCase();
+            
+            const classITerms = ['class i', 'combinations', 'fox', 'foxes', 'cunning', 'innovation', 'persuasion', 'inventiveness'];
+            const classIITerms = ['class ii', 'persistence', 'lion', 'lions', 'force', 'tradition', 'loyalty', 'conservative'];
+            
+            let classICount = 0;
+            let classIICount = 0;
+            
+            classITerms.forEach(term => {
+                const regex = new RegExp(term, 'g');
+                const matches = paretoText.match(regex);
+                if (matches) classICount += matches.length;
+            });
+            
+            classIITerms.forEach(term => {
+                const regex = new RegExp(term, 'g');
+                const matches = paretoText.match(regex);
+                if (matches) classIICount += matches.length;
+            });
+            
+            let paretoScore = 50;
+            const totalParetoTerms = classICount + classIICount;
+            if (totalParetoTerms > 0) {
+                paretoScore = Math.round((classICount / totalParetoTerms) * 100);
+            }
+            
+            const derivations = {
+                assertion: ['assertion', 'dogma', 'dogmatic', 'asserting'],
+                authority: ['authority', 'prestige', 'expert', 'respected', 'constitution', 'sacred'],
+                sentiment: ['sentiment', 'principles', 'morals', 'fairness', 'justice', 'rightness'],
+                sophistry: ['verbal proof', 'sophistry', 'verbal sophistry', 'wordplay', 'vague', 'metaphor']
+            };
+            
+            const activeDerivations = {};
+            Object.keys(derivations).forEach(key => {
+                activeDerivations[key] = derivations[key].some(term => paretoText.includes(term));
+            });
+            
+            const paretoPanel = document.getElementById("visualizer-pareto");
+            paretoPanel.innerHTML = `
+                <div class="visualizer-row">
+                    <div class="visualizer-card-mini">
+                        <div class="visualizer-title"><i class="bx bx-git-commit"></i> Elites & Residues Balance</div>
+                        <div class="gauge-container">
+                            <div class="gauge-track">
+                                <div class="gauge-fill" style="width: ${paretoScore}%; background: linear-gradient(90deg, #ef4444 0%, #06b6d4 100%);"></div>
+                            </div>
+                            <div class="gauge-labels">
+                                <span>CLASS II (LIONS / FORCE / PERSISTENCE)</span>
+                                <span>CLASS I (FOXES / PERSUASION / COMBINATIONS)</span>
+                            </div>
+                            <div class="gauge-value-display">${paretoScore}% Class I (Fox) Drive</div>
+                        </div>
+                    </div>
+                    <div class="visualizer-card-mini">
+                        <div class="visualizer-title"><i class="bx bx-message-square-detail"></i> Derivations Detected</div>
+                        <div class="badge-grid">
+                            <div class="visualizer-badge active cyan ${activeDerivations.assertion ? '' : 'inactive'}" style="${activeDerivations.assertion ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Class I: Assertion</div>
+                            <div class="visualizer-badge active cyan ${activeDerivations.authority ? '' : 'inactive'}" style="${activeDerivations.authority ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Class II: Authority</div>
+                            <div class="visualizer-badge active cyan ${activeDerivations.sentiment ? '' : 'inactive'}" style="${activeDerivations.sentiment ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Class III: Sentiments</div>
+                            <div class="visualizer-badge active cyan ${activeDerivations.sophistry ? '' : 'inactive'}" style="${activeDerivations.sophistry ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Class IV: Verbal Sophistry</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 3. Mass Psychology (Girard/Hoffer/Le Bon) Visualizer
+            const massText = (data.mass_psych_analysis || "").toLowerCase();
+            
+            const mimeticTerms = ['mimetic', 'rivalry', 'desire', 'competition', 'imitation', 'model', 'mimetic rivalry'];
+            let mimeticCount = 0;
+            mimeticTerms.forEach(term => {
+                const regex = new RegExp(term, 'g');
+                const matches = massText.match(regex);
+                if (matches) mimeticCount += matches.length;
+            });
+            let mimeticScore = Math.min(100, Math.round(mimeticCount * 15));
+            if (massText.includes('mimetic rivalry')) mimeticScore = Math.max(mimeticScore, 50);
+            if (mimeticScore === 0 && massText.length > 10) mimeticScore = 20;
+
+            const scapegoatTerms = ['scapegoat', 'unifying devil', 'devil', 'enemy', 'unify', 'purify', 'scapegoating'];
+            let scapegoatCount = 0;
+            scapegoatTerms.forEach(term => {
+                const regex = new RegExp(term, 'g');
+                const matches = massText.match(regex);
+                if (matches) scapegoatCount += matches.length;
+            });
+            let scapegoatScore = Math.min(100, Math.round(scapegoatCount * 14));
+            if (massText.includes('scapegoat') || massText.includes('unifying devil')) scapegoatScore = Math.max(scapegoatScore, 55);
+            if (scapegoatScore === 0 && massText.length > 10) scapegoatScore = 15;
+
+            const massPanel = document.getElementById("visualizer-mass_psych");
+            massPanel.innerHTML = `
+                <div class="visualizer-row">
+                    <div class="visualizer-card-mini">
+                        <div class="visualizer-title"><i class="bx bx-trending-up"></i> Mimetic Rivalry Level</div>
+                        <div class="gauge-container">
+                            <div class="gauge-track">
+                                <div class="gauge-fill" style="width: ${mimeticScore}%; background: #ec4899;"></div>
+                            </div>
+                            <div class="gauge-labels">
+                                <span>LOW IMITATION</span>
+                                <span>HIGH TENSION / CRISIS</span>
+                            </div>
+                            <div class="gauge-value-display">${mimeticScore}% Mimetic Tension</div>
+                        </div>
+                    </div>
+                    <div class="visualizer-card-mini">
+                        <div class="visualizer-title"><i class="bx bx-target-lock"></i> Scapegoat Index</div>
+                        <div class="gauge-container">
+                            <div class="gauge-track">
+                                <div class="gauge-fill" style="width: ${scapegoatScore}%; background: #ec4899;"></div>
+                            </div>
+                            <div class="gauge-labels">
+                                <span>NO CLEAR TARGET</span>
+                                <span>UNIFYING DEVIL / OUTCAST</span>
+                            </div>
+                            <div class="gauge-value-display">${scapegoatScore}% Scapegoating Index</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 4. Foucault Tab Visualizer
+            const foucaultText = (data.foucault_analysis || "").toLowerCase();
+            
+            const powerMechanisms = {
+                truthRegime: ['regime of truth', 'regimes of truth', 'truth', 'discourse', 'acceptable'],
+                normalization: ['disciplinary', 'discipline', 'surveillance', 'normalization', 'normal', 'abnormal'],
+                biopower: ['biopower', 'biopolitics', 'biological', 'population', 'mortality', 'sanitation'],
+                governmentality: ['governmentality', 'governing', 'conduct'],
+                pathologization: ['pathology', 'pathologize', 'pathologizing', 'abnormal', 'unacceptable']
+            };
+            
+            const activeMechanisms = {};
+            Object.keys(powerMechanisms).forEach(key => {
+                activeMechanisms[key] = powerMechanisms[key].some(term => foucaultText.includes(term));
+            });
+
+            const foucaultPanel = document.getElementById("visualizer-foucault");
+            foucaultPanel.innerHTML = `
+                <div class="visualizer-row">
+                    <div class="visualizer-card-mini" style="flex: 1;">
+                        <div class="visualizer-title"><i class="bx bx-key"></i> Power-Knowledge Mechanisms Detected</div>
+                        <div class="badge-grid" style="margin-top: 10px;">
+                            <div class="visualizer-badge active indigo">Power/Knowledge Co-constitution</div>
+                            <div class="visualizer-badge active indigo ${activeMechanisms.truthRegime ? '' : 'inactive'}" style="${activeMechanisms.truthRegime ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Regime of Truth</div>
+                            <div class="visualizer-badge active indigo ${activeMechanisms.normalization ? '' : 'inactive'}" style="${activeMechanisms.normalization ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Disciplinary Normalization</div>
+                            <div class="visualizer-badge active indigo ${activeMechanisms.biopower ? '' : 'inactive'}" style="${activeMechanisms.biopower ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Biopolitical Regulation</div>
+                            <div class="visualizer-badge active indigo ${activeMechanisms.governmentality ? '' : 'inactive'}" style="${activeMechanisms.governmentality ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Governmentality / Conduct</div>
+                            <div class="visualizer-badge active indigo ${activeMechanisms.pathologization ? '' : 'inactive'}" style="${activeMechanisms.pathologization ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Pathologization of Discourse</div>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
     </script>
 </body>

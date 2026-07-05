@@ -19,7 +19,7 @@ def fetch_web_page(url: str) -> dict:
 
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "PoliticalDiscourseAnalyzer/1.0 (contact: info@discourseanalyzer.org)"
         }
         response = httpx.get(url, headers=headers, timeout=15.0, follow_redirects=True)
         response.raise_for_status()

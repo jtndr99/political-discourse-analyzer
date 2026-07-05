@@ -28,6 +28,8 @@ mcp_toolset = get_mcp_toolset()
 
 # Define model settings
 MODEL_NAME = "gemini-3.1-flash-lite"
+DEFAULT_GEN_CONFIG = types.GenerateContentConfig(temperature=0.0)
+
 
 
 def get_model():
@@ -46,6 +48,7 @@ def create_input_agent() -> Agent:
         ),
         tools=[fetch_web_page],
         output_key="article_text",
+        generate_content_config=DEFAULT_GEN_CONFIG,
     )
 
 
@@ -64,6 +67,7 @@ def create_pareto_analyst() -> Agent:
         ),
         tools=[mcp_toolset],
         output_key="pareto_analysis",
+        generate_content_config=DEFAULT_GEN_CONFIG,
     )
 
 
@@ -82,6 +86,7 @@ def create_sowell_analyst() -> Agent:
         ),
         tools=[mcp_toolset],
         output_key="sowell_analysis",
+        generate_content_config=DEFAULT_GEN_CONFIG,
     )
 
 
@@ -99,6 +104,7 @@ def create_mass_psych_analyst() -> Agent:
         ),
         tools=[mcp_toolset],
         output_key="mass_psych_analysis",
+        generate_content_config=DEFAULT_GEN_CONFIG,
     )
 
 
@@ -117,6 +123,7 @@ def create_foucault_analyst() -> Agent:
         ),
         tools=[mcp_toolset],
         output_key="foucault_analysis",
+        generate_content_config=DEFAULT_GEN_CONFIG,
     )
 
 
@@ -141,6 +148,7 @@ def create_synthesizer() -> Agent:
             "Your output must be the final markdown report itself."
         ),
         output_key="final_report",
+        generate_content_config=DEFAULT_GEN_CONFIG,
     )
 
 

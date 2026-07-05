@@ -232,6 +232,19 @@ async def get_report(report_id: int):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.delete("/history/{report_id}")
+async def delete_report(report_id: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM analyses WHERE id = ?", (report_id,))
+        conn.commit()
+        conn.close()
+        return JSONResponse(content={"status": "success", "message": f"Report {report_id} deleted."})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 if __name__ == "__main__":
     # Ensure analyses.db is initialized before starting
     from app.mcp_server import init_db
