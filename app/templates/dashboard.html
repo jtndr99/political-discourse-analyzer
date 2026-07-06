@@ -1108,21 +1108,14 @@
             // Clear active history items
             document.querySelectorAll(".history-item").forEach(el => el.classList.remove("active"));
             
-            // Steps simulation timeline
+            // Reset loader step descriptions to original values
+            document.querySelector("#step1 .step-text").innerHTML = "Step 1: Reading input & fetching webpage content (InputAgent)...";
+            document.querySelector("#step2 .step-text").innerHTML = "Step 2: Pareto, Sowell, Schmitt, Le Bon, Hoffer, Girard, and Foucault analyzing sequentially...";
+            document.querySelector("#step3 .step-text").innerHTML = "Step 3: Synthesizer compiling report and saving to SQLite DB...";
+
             setStepState(1, "active");
             setStepState(2, "pending");
             setStepState(3, "pending");
-            
-            // Simulate agent transitions visually
-            const t1 = setTimeout(() => {
-                setStepState(1, "completed");
-                setStepState(2, "active");
-            }, 4000);
-            
-            const t2 = setTimeout(() => {
-                setStepState(2, "completed");
-                setStepState(3, "active");
-            }, 12000);
 
             try {
                 const res = await fetch("/analyze", {
@@ -1136,26 +1129,87 @@
                     throw new Error(errData.detail || "Server error occurred");
                 }
                 
-                const data = await res.json();
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
                 
-                clearTimeout(t1);
-                clearTimeout(t2);
+                let accumulatedData = {
+                    session_id: null,
+                    article_text: inputText,
+                    pareto_analysis: "",
+                    sowell_analysis: "",
+                    mass_psych_analysis: "",
+                    foucault_analysis: "",
+                    final_report: "",
+                    pareto_metrics: {},
+                    sowell_metrics: {},
+                    mass_psych_metrics: {},
+                    foucault_metrics: {}
+                };
                 
-                // Set all steps completed
-                setStepState(1, "completed");
-                setStepState(2, "completed");
-                setStepState(3, "completed");
-                
-                setTimeout(() => {
-                    loadingContainer.style.display = "none";
-                    document.getElementById("analyzeBtn").disabled = false;
-                    displayReport(data);
-                    loadHistory(); // Reload history sidebar
-                }, 1000);
-                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n\n");
+                    buffer = lines.pop(); // keep partial line in buffer
+                    
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            const rawData = line.substring(6);
+                            try {
+                                const parsed = JSON.parse(rawData);
+                                
+                                if (parsed.event === "start") {
+                                    accumulatedData.session_id = parsed.session_id;
+                                    setStepState(1, "active");
+                                } else if (parsed.event === "input_processed") {
+                                    setStepState(1, "completed");
+                                    setStepState(2, "active");
+                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Running Pareto Analyst...";
+                                    accumulatedData.article_text = parsed.data.text;
+                                } else if (parsed.event === "pareto_completed") {
+                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Running Sowell Analyst...";
+                                    accumulatedData.pareto_analysis = parsed.data.analysis;
+                                    accumulatedData.pareto_metrics = parsed.data.metrics;
+                                } else if (parsed.event === "sowell_completed") {
+                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Running Mass Psychology Analyst...";
+                                    accumulatedData.sowell_analysis = parsed.data.analysis;
+                                    accumulatedData.sowell_metrics = parsed.data.metrics;
+                                } else if (parsed.event === "mass_psych_completed") {
+                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Running Foucault Analyst...";
+                                    accumulatedData.mass_psych_analysis = parsed.data.analysis;
+                                    accumulatedData.mass_psych_metrics = parsed.data.metrics;
+                                } else if (parsed.event === "foucault_completed") {
+                                    setStepState(2, "completed");
+                                    setStepState(3, "active");
+                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Framework analysis completed.";
+                                    accumulatedData.foucault_analysis = parsed.data.analysis;
+                                    accumulatedData.foucault_metrics = parsed.data.metrics;
+                                } else if (parsed.event === "synthesis_completed") {
+                                    setStepState(3, "completed");
+                                    accumulatedData.final_report = parsed.data.report_md;
+                                    accumulatedData.title = parsed.data.title;
+                                    accumulatedData.summary = parsed.data.summary;
+                                } else if (parsed.event === "complete") {
+                                    // Done! Display the report
+                                    setTimeout(() => {
+                                        loadingContainer.style.display = "none";
+                                        document.getElementById("analyzeBtn").disabled = false;
+                                        displayReport(accumulatedData);
+                                        loadHistory(); // Reload history sidebar
+                                    }, 1000);
+                                } else if (parsed.event === "error") {
+                                    throw new Error(parsed.message);
+                                }
+                            } catch (err) {
+                                console.error("Error parsing stream chunk:", err, "Raw line:", line);
+                            }
+                        }
+                    }
+                }
             } catch (e) {
-                clearTimeout(t1);
-                clearTimeout(t2);
                 alert("Analysis failed: " + e.message);
                 loadingContainer.style.display = "none";
                 document.getElementById("analyzeBtn").disabled = false;

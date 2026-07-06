@@ -7,7 +7,7 @@ import uuid
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -109,7 +109,7 @@ async def analyze_discourse(payload: AnalysisRequest):
     session_id = str(uuid.uuid4())
     app_name = "app"
 
-    logger.info(f"Starting analysis for session {session_id}...")
+    logger.info(f"Starting SSE analysis for session {session_id}...")
 
     # Initialize ADK runner and session service
     session_service = InMemorySessionService()
@@ -120,144 +120,229 @@ async def analyze_discourse(payload: AnalysisRequest):
         agent=root_agent, app_name=app_name, session_service=session_service
     )
 
-    try:
-        # Run agent programmatically with the user input
-        async for event in runner.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=types.Content(
-                role="user", parts=[types.Part.from_text(text=input_text)]
-            ),
-        ):
-            # Log sub-agent execution status in the console
-            if event.author:
-                logger.info(f"[{event.author}] Event generated")
-
-        # Retrieve the accumulated state containing individual sub-agent analyses
-        session = await session_service.get_session(
-            app_name=app_name, user_id=user_id, session_id=session_id
-        )
-        state = session.state
-
-        # Build payload response
-        final_report = state.get("final_report", "No final report generated.")
-        original_text = state.get("article_text", input_text)
-        
-        pareto_raw = state.get("pareto_analysis", "")
-        sowell_raw = state.get("sowell_analysis", "")
-        mass_psych_raw = state.get("mass_psych_analysis", "")
-        foucault_raw = state.get("foucault_analysis", "")
-
-        pareto_md, pareto_metrics = parse_analyst_output(pareto_raw)
-        sowell_md, sowell_metrics = parse_analyst_output(sowell_raw)
-        mass_psych_md, mass_psych_metrics = parse_analyst_output(mass_psych_raw)
-        foucault_md, foucault_metrics = parse_analyst_output(foucault_raw)
-
-        # Programmatically parse title, summary, and report_md from final_report
+    async def event_generator():
         import json
-        title = "Discourse Analysis"
-        summary = ""
-        report_md = "No final report generated."
-
-        # Support dict (automatically parsed by ADK), Pydantic objects, and raw strings
-        if isinstance(final_report, dict):
-            title = final_report.get("title", title)
-            summary = final_report.get("summary", summary)
-            report_md = final_report.get("report_md", report_md)
-        elif hasattr(final_report, "model_dump"):
-            try:
-                report_dict = final_report.model_dump()
-                title = report_dict.get("title", title)
-                summary = report_dict.get("summary", summary)
-                report_md = report_dict.get("report_md", report_md)
-            except Exception as e:
-                logger.error(f"Failed to dump Pydantic model: {e}")
-        elif isinstance(final_report, str):
-            cleaned_report = re.sub(r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE)
-            try:
-                # Attempt to parse final_report as a JSON object
-                report_data = json.loads(cleaned_report)
-                title = report_data.get("title", title)
-                summary = report_data.get("summary", summary)
-                report_md = report_data.get("report_md", report_md)
-            except Exception as e:
-                logger.info(f"Synthesizer output is not JSON, treating as raw markdown: {e}")
-                # Fallback parsing logic for unstructured markdown output
-                report_md = final_report
-                lines = final_report.strip().split("\n")
-                for line in lines:
-                    if line.startswith("# "):
-                        title = line[2:].strip().replace("*", "").replace("_", "")
-                        break
-
-                lower_report = final_report.lower()
-                summary_idx = -1
-                for keyword in ["executive summary", "summary"]:
-                    summary_idx = lower_report.find(keyword)
-                    if summary_idx != -1:
-                        summary_text = final_report[summary_idx + len(keyword):].strip()
-                        summary_text = summary_text.lstrip(":- \t\r\n")
-                        end_idx = len(summary_text)
-                        for term in ["\n\n", "\n#", "\n*"]:
-                            pos = summary_text.find(term)
-                            if pos != -1 and pos < end_idx:
-                                end_idx = pos
-                        summary = summary_text[:end_idx].strip()
-                        break
-                if not summary:
-                    # Fallback: first two content lines
-                    content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
-                    if content_lines:
-                        summary = " ".join(content_lines[:2])
-                        if len(summary) > 200:
-                            summary = summary[:197] + "..."
-        else:
-            logger.warning(f"Unexpected type for final_report: {type(final_report)}")
-            report_md = str(final_report)
-
-        # Save to SQLite database programmatically
         try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO analyses (title, source, report_md, summary, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    title,
-                    input_text,
-                    report_md,
-                    summary,
-                    original_text,
-                    get_db_value(pareto_raw),
-                    get_db_value(sowell_raw),
-                    get_db_value(mass_psych_raw),
-                    get_db_value(foucault_raw),
+            # Yield start event
+            yield f"data: {json.dumps({'event': 'start', 'session_id': session_id})}\n\n"
+
+            # Run agent programmatically with the user input
+            async for event in runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=types.Content(
+                    role="user", parts=[types.Part.from_text(text=input_text)]
                 ),
+            ):
+                if event.author:
+                    logger.info(f"[{event.author}] Event generated (SSE)")
+                    
+                    # Fetch session state for the partial result
+                    session = await session_service.get_session(
+                        app_name=app_name, user_id=user_id, session_id=session_id
+                    )
+                    state = session.state
+                    
+                    event_type = None
+                    payload_data = {}
+                    
+                    if event.author == "InputAgent":
+                        event_type = "input_processed"
+                        payload_data = {"text": state.get("article_text", "")}
+                    elif event.author == "ParetoAnalyst":
+                        event_type = "pareto_completed"
+                        pareto_raw = state.get("pareto_analysis", "")
+                        pareto_md, pareto_metrics = parse_analyst_output(pareto_raw)
+                        payload_data = {"analysis": pareto_md, "metrics": pareto_metrics}
+                    elif event.author == "SowellAnalyst":
+                        event_type = "sowell_completed"
+                        sowell_raw = state.get("sowell_analysis", "")
+                        sowell_md, sowell_metrics = parse_analyst_output(sowell_raw)
+                        payload_data = {"analysis": sowell_md, "metrics": sowell_metrics}
+                    elif event.author == "MassPsychAnalyst":
+                        event_type = "mass_psych_completed"
+                        mass_psych_raw = state.get("mass_psych_analysis", "")
+                        mass_psych_md, mass_psych_metrics = parse_analyst_output(mass_psych_raw)
+                        payload_data = {"analysis": mass_psych_md, "metrics": mass_psych_metrics}
+                    elif event.author == "FoucaultAnalyst":
+                        event_type = "foucault_completed"
+                        foucault_raw = state.get("foucault_analysis", "")
+                        foucault_md, foucault_metrics = parse_analyst_output(foucault_raw)
+                        payload_data = {"analysis": foucault_md, "metrics": foucault_metrics}
+                    elif event.author == "Synthesizer":
+                        event_type = "synthesis_completed"
+                        final_report = state.get("final_report", "No final report generated.")
+                        
+                        # Programmatically parse title, summary, and report_md from final_report
+                        title = "Discourse Analysis"
+                        summary = ""
+                        report_md = "No final report generated."
+
+                        if isinstance(final_report, dict):
+                            title = final_report.get("title", title)
+                            summary = final_report.get("summary", summary)
+                            report_md = final_report.get("report_md", report_md)
+                        elif hasattr(final_report, "model_dump"):
+                            try:
+                                report_dict = final_report.model_dump()
+                                title = report_dict.get("title", title)
+                                summary = report_dict.get("summary", summary)
+                                report_md = report_dict.get("report_md", report_md)
+                            except Exception as e:
+                                logger.error(f"Failed to dump Pydantic model in SSE: {e}")
+                        elif isinstance(final_report, str):
+                            cleaned_report = re.sub(r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE)
+                            try:
+                                report_data = json.loads(cleaned_report)
+                                title = report_data.get("title", title)
+                                summary = report_data.get("summary", summary)
+                                report_md = report_data.get("report_md", report_md)
+                            except Exception as e:
+                                logger.info(f"Synthesizer output is not JSON, treating as raw markdown: {e}")
+                                report_md = final_report
+                                lines = final_report.strip().split("\n")
+                                for line in lines:
+                                    if line.startswith("# "):
+                                        title = line[2:].strip().replace("*", "").replace("_", "")
+                                        break
+
+                                lower_report = final_report.lower()
+                                summary_idx = -1
+                                for keyword in ["executive summary", "summary"]:
+                                    summary_idx = lower_report.find(keyword)
+                                    if summary_idx != -1:
+                                        summary_text = final_report[summary_idx + len(keyword):].strip()
+                                        summary_text = summary_text.lstrip(":- \t\r\n")
+                                        end_idx = len(summary_text)
+                                        for term in ["\n\n", "\n#", "\n*"]:
+                                            pos = summary_text.find(term)
+                                            if pos != -1 and pos < end_idx:
+                                                end_idx = pos
+                                        summary = summary_text[:end_idx].strip()
+                                        break
+                                if not summary:
+                                    content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
+                                    if content_lines:
+                                        summary = " ".join(content_lines[:2])
+                                        if len(summary) > 200:
+                                            summary = summary[:197] + "..."
+                        else:
+                            report_md = str(final_report)
+                            
+                        payload_data = {
+                            "title": title,
+                            "summary": summary,
+                            "report_md": report_md
+                        }
+                    
+                    if event_type:
+                        sse_msg = {
+                            "event": event_type,
+                            "session_id": session_id,
+                            "data": payload_data
+                        }
+                        yield f"data: {json.dumps(sse_msg)}\n\n"
+
+            # Finally, retrieve full final state to save to SQLite database
+            session = await session_service.get_session(
+                app_name=app_name, user_id=user_id, session_id=session_id
             )
-            conn.commit()
-            conn.close()
-            logger.info("Successfully saved analysis report to SQLite database programmatically.")
+            state = session.state
+            
+            final_report = state.get("final_report", "No final report generated.")
+            original_text = state.get("article_text", input_text)
+            
+            pareto_raw = state.get("pareto_analysis", "")
+            sowell_raw = state.get("sowell_analysis", "")
+            mass_psych_raw = state.get("mass_psych_analysis", "")
+            foucault_raw = state.get("foucault_analysis", "")
+
+            # Parsing to extract title/summary for db record
+            title = "Discourse Analysis"
+            summary = ""
+            report_md = "No final report generated."
+
+            if isinstance(final_report, dict):
+                title = final_report.get("title", title)
+                summary = final_report.get("summary", summary)
+                report_md = final_report.get("report_md", report_md)
+            elif hasattr(final_report, "model_dump"):
+                try:
+                    report_dict = final_report.model_dump()
+                    title = report_dict.get("title", title)
+                    summary = report_dict.get("summary", summary)
+                    report_md = report_dict.get("report_md", report_md)
+                except Exception:
+                    pass
+            elif isinstance(final_report, str):
+                cleaned_report = re.sub(r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE)
+                try:
+                    report_data = json.loads(cleaned_report)
+                    title = report_data.get("title", title)
+                    summary = report_data.get("summary", summary)
+                    report_md = report_data.get("report_md", report_md)
+                except Exception:
+                    report_md = final_report
+                    lines = final_report.strip().split("\n")
+                    for line in lines:
+                        if line.startswith("# "):
+                            title = line[2:].strip().replace("*", "").replace("_", "")
+                            break
+
+                    lower_report = final_report.lower()
+                    summary_idx = -1
+                    for keyword in ["executive summary", "summary"]:
+                        summary_idx = lower_report.find(keyword)
+                        if summary_idx != -1:
+                            summary_text = final_report[summary_idx + len(keyword):].strip()
+                            summary_text = summary_text.lstrip(":- \t\r\n")
+                            end_idx = len(summary_text)
+                            for term in ["\n\n", "\n#", "\n*"]:
+                                pos = summary_text.find(term)
+                                if pos != -1 and pos < end_idx:
+                                    end_idx = pos
+                            summary = summary_text[:end_idx].strip()
+                            break
+                    if not summary:
+                        content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
+                        if content_lines:
+                            summary = " ".join(content_lines[:2])
+                            if len(summary) > 200:
+                                summary = summary[:197] + "..."
+
+            db_id = None
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO analyses (title, source, report_md, summary, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        title,
+                        input_text,
+                        report_md,
+                        summary,
+                        original_text,
+                        get_db_value(pareto_raw),
+                        get_db_value(sowell_raw),
+                        get_db_value(mass_psych_raw),
+                        get_db_value(foucault_raw),
+                    ),
+                )
+                db_id = cursor.lastrowid
+                conn.commit()
+                conn.close()
+                logger.info(f"Successfully saved analysis report {db_id} to SQLite database programmatically.")
+            except Exception as e:
+                logger.error(f"Failed to save analysis report to database: {e}")
+
+            # Yield complete event with database row ID
+            yield f"data: {json.dumps({'event': 'complete', 'session_id': session_id, 'db_id': db_id})}\n\n"
+
         except Exception as e:
-            logger.error(f"Failed to save analysis report to database: {e}")
+            logger.error(f"Error during SSE analysis generator: {e}", exc_info=True)
+            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
 
-        response_data = {
-            "session_id": session_id,
-            "article_text": original_text,
-            "pareto_analysis": pareto_md,
-            "sowell_analysis": sowell_md,
-            "mass_psych_analysis": mass_psych_md,
-            "foucault_analysis": foucault_md,
-            "final_report": report_md,
-            "pareto_metrics": pareto_metrics,
-            "sowell_metrics": sowell_metrics,
-            "mass_psych_metrics": mass_psych_metrics,
-            "foucault_metrics": foucault_metrics,
-        }
-
-        return JSONResponse(content=response_data)
-
-    except Exception as e:
-        logger.error(f"Error during analysis: {e!s}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {e!s}") from e
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @app.get("/history")
