@@ -1,6 +1,6 @@
 # 🏛️ Political Discourse Analyzer
 
-An advanced multi-agent system built using the **Google ADK (Agent Development Kit)** and the **Model Context Protocol (MCP)**. This system analyzes political text, articles, or speeches from multiple classical sociological and philosophical lenses: Vilfredo Pareto, Thomas Sowell, Gustave Le Bon & Eric Hoffer (Mass Psychology), and Michel Foucault. 
+An advanced multi-agent system built using the **Google ADK (Agent Development Kit)** and the **Model Context Protocol (MCP)**. This system analyzes political text, articles, or speeches from multiple classical sociological and philosophical lenses: Vilfredo Pareto, Thomas Sowell, Carl Schmitt, Gustave Le Bon, Eric Hoffer, René Girard, and Michel Foucault. 
 
 It synthesizes these viewpoints into a cohesive, publication-grade analytical report, saved in a local SQLite database and rendered in a sleek, responsive dark-mode dashboard.
 
@@ -10,53 +10,53 @@ It synthesizes these viewpoints into a cohesive, publication-grade analytical re
 
 In the digital age, political rhetoric is louder and more polarized than ever. Citizens, journalists, and researchers are bombarded with sophisticated persuasion tactics, cognitive biases, and ideological framing. Standard LLM summarizers capture *what* was said, but fail to analyze *how* it was framed, *why* certain rhetorical devices were chosen, and *what* underlying sociological structures are being activated.
 
-The **Political Discourse Analyzer** solves this by decomposing rhetoric through four classical sociological and philosophical frameworks:
-1. **Vilfredo Pareto's Theory of Residues and Derivations**: Deconstructs non-logical sentiments (Foxes vs. Lions) and intellectual justifications.
+The **Political Discourse Analyzer** solves this by deconstructing rhetoric sequentially through seven classical sociological and philosophical frameworks:
+1. **Vilfredo Pareto's Residues & Derivations**: Deconstructs non-logical sentiments (Foxes vs. Lions) and intellectual justifications.
 2. **Thomas Sowell's Political Visions**: Identifies whether the discourse operates under a *Constrained (Tragic) Vision* or an *Unconstrained (Utopian) Vision* of human nature.
-3. **Gustave Le Bon & Eric Hoffer (Mass Crowd Psychology)**: Examines crowd triggers (simplification, repetition, contagion) and fanatical true-believer patterns.
-4. **Michel Foucault's Power/Knowledge (Pouvoir-Savoir)**: Explores regimes of truth, disciplinary normalization, and biopolitical control.
+3. **Carl Schmitt's Friend/Enemy Distinction**: Measures the existential polarization intensity of political conflict.
+4. **Gustave Le Bon's Crowd Psychology**: Examines suggestibility, contagion, and emotional simplification.
+5. **Eric Hoffer's Mass Movements**: Studies the psychology of the "True Believer" and fanatical group devotion.
+6. **René Girard's Scapegoating & Mimetic Theory**: Evaluates status rivalry and collective purification rituals.
+7. **Michel Foucault's Power/Knowledge (Pouvoir-Savoir)**: Explores regimes of truth, disciplinary normalization, and biopolitical governmentality.
 
 ---
 
 ## 🏗️ Architecture
 
-The system uses a pipeline of specialized agents running sequentially to avoid LLM rate limits, ground their analyses using custom MCP tools, and store the output in a relational database.
+To avoid rate limits and model overloading, the system uses a pipeline of specialized agents executing **sequentially** in a thread-safe environment. 
 
 ```mermaid
 graph TD
     A[User Input: Text or URL] --> B[InputAgent]
     B -->|Scrapes/Cleans via BeautifulSoup| C[Clean Article Text]
     
-    C --> D[ParetoAnalyst]
-    C --> E[SowellAnalyst]
-    C --> F[MassPsychAnalyst]
-    C --> G[FoucaultAnalyst]
+    C -->|Sequentially Executes| D[ParetoAnalyst]
+    D -->|Accumulates State| E[SowellAnalyst]
+    E -->|Accumulates State| F[MassPsychAnalyst]
+    F -->|Accumulates State| G[FoucaultAnalyst]
     
     D & E & F & G -->|Grounding Concepts| MCP[local MCP Server]
     
-    D -->|Pareto Report| H[Synthesizer]
-    E -->|Sowell Report| H
-    F -->|Mass Psych Report| H
-    G -->|Foucault Report| H
+    G -->|All Analyst Reports| H[Synthesizer]
     
-    H -->|Saves to analyses.db| MCP
-    H -->|Markdown Synthesized Report| I[Web Dashboard]
+    H -->|Synthesized Report Payload| WS[Web Server]
+    WS -->|Programmatic Save| DB[(analyses.db)]
+    WS -->|Real-time SSE Events| I[Web Dashboard]
 ```
 
 ### 🤖 Multi-Agent Pipeline (`app/agent.py`)
-- **`InputAgent`**: Determines if the input is a URL. If so, it invokes a local scraping tool (`fetch_web_page`) to pull text, strip scripts/styles, and truncate text to prevent context windows explosion.
-- **`ParetoAnalyst`**: Focuses on Pareto's theories. Grabs reference material from MCP, analyzes the text, and returns residues/derivations quotes.
-- **`SowellAnalyst`**: Focuses on Sowell's conflict visions. Grabs definitions from MCP and evaluates human nature constraints.
-- **`MassPsychAnalyst`**: Focuses on crowd suggestion and fanatical movements (Le Bon/Hoffer).
-- **`FoucaultAnalyst`**: Analyzes the text for Power/Knowledge, Regimes of Truth, and Biopower.
-- **`Synthesizer`**: Compiles all individual reports, generates a premium markdown report with a title, subtitle, and short executive summary, and writes it to SQLite using MCP.
+- **`InputAgent`**: Scrapes a webpage or consumes raw text, stripping script and styling noise.
+- **`ParetoAnalyst`**: Focuses on Pareto's residues and derivations.
+- **`SowellAnalyst`**: Focuses on Sowell's conflict visions and Carl Schmitt's Friend/Enemy polarity.
+- **`MassPsychAnalyst`**: Examines crowd suggestion, Hoffer's True Believers, and René Girard's Scapegoating.
+- **`FoucaultAnalyst`**: Analyzes the text for Power/Knowledge, Normalization, and Biopower boundaries.
+- **`Synthesizer`**: Compiles all individual analyst reports into a premium JSON report.
+- **`Web Server`**: Orchestrates the run using `runner.run_async()`, streams progress chunks to the client via Server-Sent Events (SSE), and programmatically writes the final state to SQLite.
 
 ### 🔌 Custom MCP Server (`app/mcp_server.py`)
-Exposes tools to the pipeline:
-1. `get_framework_definition`: Retrieves reference grounding texts for each sociologist/philosopher so agents analyze with high conceptual alignment.
-2. `save_analysis_report`: Persists original text, individual specialist reports, final report, and executive summary to SQLite.
-3. `list_analysis_reports`: Queries SQLite to retrieve all historical summaries.
-4. `get_analysis_report`: Retrieves a specific report's full details and individual analyses.
+Exposes reference definition lookup tools to the pipeline:
+1. `get_framework_definition`: Retrieves grounding texts for each sociologist/philosopher to align agent context.
+2. `save_analysis_report` / `list_analysis_reports` / `get_analysis_report`: Standard CRUD endpoints exposed for other local clients connecting via MCP.
 
 ---
 
@@ -66,11 +66,11 @@ As part of Kaggle's Capstone requirements, this project implements the following
 
 | Course Concept | Implementation Details | Location in Code |
 | :--- | :--- | :--- |
-| **Agent / Multi-Agent System** | Six specialized agent roles organized as a `SequentialAgent` pipeline using the **Google ADK**. | [`app/agent.py`](file:///d:/political-discourse-analyzer/app/agent.py) |
-| **MCP Server Integration** | Fully custom Model Context Protocol server exposing database storage and grounding definition retrieval tools. | [`app/mcp_server.py`](file:///d:/political-discourse-analyzer/app/mcp_server.py) |
-| **Antigravity & Agents CLI** | Used for environment setup, interactive prototyping (`playground`), linting, and evaluation tracking. | [`GEMINI.md`](file:///d:/political-discourse-analyzer/GEMINI.md) |
-| **Security Features** | Sanitizes web inputs using BeautifulSoup to strip `<script>`, `<style>`, `<header>`, and `<footer>` tags (preventing injection & noise), isolates API keys from codebase, and includes rate-limiting safety margins. | [`app/tools.py`](file:///d:/political-discourse-analyzer/app/tools.py) |
-| **Deployability** | Containerized with a lightweight `Dockerfile`, pre-configured for GCP deployments, and integrated with OpenTelemetry. | [`Dockerfile`](file:///d:/political-discourse-analyzer/Dockerfile) |
+| **Agent / Multi-Agent System** | Six specialized agent roles organized as a sequential pipeline using the **Google ADK**. | [`app/agent.py`](file:///d:/Projects/VibeCoding/political-discourse-analyzer/app/agent.py) |
+| **MCP Server Integration** | Custom Model Context Protocol server exposing database storage and grounding definition retrieval tools. | [`app/mcp_server.py`](file:///d:/Projects/VibeCoding/political-discourse-analyzer/app/mcp_server.py) |
+| **Antigravity & Agents CLI** | Used for environment setup, interactive prototyping (`playground`), linting, and evaluation tracking. | [`GEMINI.md`](file:///d:/Projects/VibeCoding/political-discourse-analyzer/GEMINI.md) |
+| **Security Features** | Sanitizes web inputs using BeautifulSoup to strip `<script>`, `<style>`, `<header>`, and `<footer>` tags, and uses a Token Bucket `RateLimiterPlugin` to pace Gemini API requests. | [`app/tools.py`](file:///d:/Projects/VibeCoding/political-discourse-analyzer/app/tools.py) |
+| **Deployability** | Containerized with a lightweight `Dockerfile`, pre-configured for GCP deployments, and integrated with OpenTelemetry. | [`Dockerfile`](file:///d:/Projects/VibeCoding/political-discourse-analyzer/Dockerfile) |
 
 ---
 
