@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import sqlite3
 import sys
 import uuid
@@ -61,9 +62,11 @@ def parse_analyst_output(output_raw):
         except Exception as e:
             logger.error(f"Failed to dump analyst Pydantic model: {e}")
     elif isinstance(output_raw, str) and output_raw.strip():
+        # Strip markdown JSON wrappers if present
+        cleaned_str = re.sub(r"^```json\s*|\s*```$", "", output_raw.strip(), flags=re.MULTILINE)
         # Try to parse as JSON first
         try:
-            parsed = json.loads(output_raw)
+            parsed = json.loads(cleaned_str)
             if isinstance(parsed, dict):
                 analysis_md = parsed.get("analysis_md", analysis_md)
                 metrics = {k: v for k, v in parsed.items() if k != "analysis_md"}
@@ -170,9 +173,10 @@ async def analyze_discourse(payload: AnalysisRequest):
             except Exception as e:
                 logger.error(f"Failed to dump Pydantic model: {e}")
         elif isinstance(final_report, str):
+            cleaned_report = re.sub(r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE)
             try:
                 # Attempt to parse final_report as a JSON object
-                report_data = json.loads(final_report)
+                report_data = json.loads(cleaned_report)
                 title = report_data.get("title", title)
                 summary = report_data.get("summary", summary)
                 report_md = report_data.get("report_md", report_md)

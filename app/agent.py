@@ -55,6 +55,7 @@ mcp_toolset = get_mcp_toolset()
 # Define model settings
 MODEL_NAME = "gemini-3.1-flash-lite"
 DEFAULT_GEN_CONFIG = types.GenerateContentConfig(temperature=0.0)
+SYNTHESIZER_GEN_CONFIG = types.GenerateContentConfig(temperature=0.3)
 
 
 
@@ -91,7 +92,10 @@ def create_pareto_analyst() -> Agent:
             "Provide specific quotes from the text as evidence and explain how they map to Pareto's concepts. "
             "Your output must be a JSON object conforming to the output schema, containing:\n"
             "- analysis_md: The detailed analysis in Markdown format.\n"
-            "- fox_drive_score: Integer (0 to 100) indicating Class I Fox Drive vs Class II Lion Drive.\n"
+            "- fox_drive_score: Integer (0 to 100) indicating Class I Fox Drive vs Class II Lion Drive. Calibrate the score strictly using this rubric:\n"
+            "  * 0 to 20: Strict Class II Lion dominance (reliance on force, tradition, conservation, group persistence).\n"
+            "  * 40 to 60: Balanced or ambiguous mix of Fox and Lion strategies.\n"
+            "  * 80 to 100: Strict Class I Fox dominance (reliance on cunning, combinations, innovation, political persuasion).\n"
             "- derivations_detected: List of derivations detected (from assertion, authority, sentiment, sophistry).\n"
             "Only perform the analysis. Do NOT call save_analysis_report and do NOT ask if you should save the report."
         ),
@@ -115,8 +119,14 @@ def create_sowell_analyst() -> Agent:
             "Cite specific quotes as evidence and explain your reasoning. "
             "Your output must be a JSON object conforming to the output schema, containing:\n"
             "- analysis_md: The detailed analysis in Markdown format.\n"
-            "- unconstrained_score: Integer (0 to 100) indicating Utopian/Unconstrained vision drive.\n"
-            "- schmitt_intensity: Integer (0 to 100) indicating existential conflict intensity.\n"
+            "- unconstrained_score: Integer (0 to 100) indicating Utopian/Unconstrained vision drive. Calibrate the score strictly using this rubric:\n"
+            "  * 0 to 20: Pure Constrained (Tragic) vision (explicit focus on trade-offs, systemic processes, limits of human knowledge, rule of law, and institutional tradition).\n"
+            "  * 40 to 60: Balanced or ambiguous synthesis of trade-offs and political solutions.\n"
+            "  * 80 to 100: Pure Unconstrained (Utopian) vision (focus on direct solutions, expert planning, perfectibility of human nature, and social engineering).\n"
+            "- schmitt_intensity: Integer (0 to 100) indicating existential conflict intensity. Calibrate the score strictly using this rubric:\n"
+            "  * 0 to 20: Liberal parliamentary debate (conflict seen as mock argument or commercial competition; compromises are readily possible).\n"
+            "  * 40 to 60: Highly adversarial, but stops short of absolute existential struggle.\n"
+            "  * 80 to 100: Absolute existential conflict (politics framed as a friend-versus-enemy combat; opponents are constructed as an existential threat to be excluded or eliminated).\n"
             "Only perform the analysis. Do NOT call save_analysis_report and do NOT ask if you should save the report."
         ),
         tools=[mcp_toolset],
@@ -138,8 +148,14 @@ def create_mass_psych_analyst() -> Agent:
             "Cite specific quotes as evidence and explain their psychological impact. "
             "Your output must be a JSON object conforming to the output schema, containing:\n"
             "- analysis_md: The detailed analysis in Markdown format.\n"
-            "- mimetic_tension: Integer (0 to 100) indicating mimetic rivalry tension.\n"
-            "- scapegoat_index: Integer (0 to 100) indicating scapegoating intensity.\n"
+            "- mimetic_tension: Integer (0 to 100) indicating mimetic rivalry tension. Calibrate the score strictly using this rubric:\n"
+            "  * 0 to 20: Independent desires (cooperation, absence of imitation, diverse/non-competitive political goals).\n"
+            "  * 40 to 60: Moderate mimetic imitation or comparison-driven status anxiety.\n"
+            "  * 80 to 100: Extreme mimetic crisis (obsessive imitation and fierce, direct competition for identical status/power leading to pure conflict).\n"
+            "- scapegoat_index: Integer (0 to 100) indicating scapegoating intensity. Calibrate the score strictly using this rubric:\n"
+            "  * 0 to 20: No target singled out (blame is systemic or absent; conflicts are resolved through structured channels).\n"
+            "  * 40 to 60: Rhetorical finger-pointing without collective purification rituals.\n"
+            "  * 80 to 100: Intense scapegoating (a single person or group is framed as the 'unifying devil' or absolute source of evil whose exclusion is required to bring harmony/unity).\n"
             "Only perform the analysis. Do NOT call save_analysis_report and do NOT ask if you should save the report."
         ),
         tools=[mcp_toolset],
@@ -162,7 +178,8 @@ def create_foucault_analyst() -> Agent:
             "Cite specific quotes as evidence. "
             "Your output must be a JSON object conforming to the output schema, containing:\n"
             "- analysis_md: The detailed analysis in Markdown format.\n"
-            "- mechanisms_detected: List of mechanisms detected (from truthRegime, normalization, biopower, governmentality, pathologization).\n"
+            "- mechanisms_detected: List of mechanisms detected. You MUST restrict your selection strictly to these exact string values: "
+            "['truthRegime', 'normalization', 'biopower', 'governmentality', 'pathologization']. Any others will break the dashboard rendering.\n"
             "Only perform the analysis. Do NOT call save_analysis_report and do NOT ask if you should save the report."
         ),
         tools=[mcp_toolset],
@@ -197,7 +214,7 @@ def create_synthesizer() -> Agent:
         ),
         output_key="final_report",
         output_schema=SynthesisReport,
-        generate_content_config=DEFAULT_GEN_CONFIG,
+        generate_content_config=SYNTHESIZER_GEN_CONFIG,
     )
 
 

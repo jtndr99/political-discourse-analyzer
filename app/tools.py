@@ -43,8 +43,22 @@ def fetch_web_page(url: str) -> dict:
 
         # Limit length to prevent context explosion, say 15000 characters
         if len(clean_text) > 15000:
+            # Find the last paragraph break before the 15k limit
+            cut_off = clean_text.rfind("\n\n", 0, 15000)
+            # Fallback to last sentence if no paragraphs
+            if cut_off == -1:
+                cut_off = clean_text.rfind(". ", 0, 15000)
+            # Fallback to hard character cap if no sentence/paragraph found
+            if cut_off == -1:
+                cut_off = 15000
+            else:
+                # Include the period if it was a sentence boundary
+                if clean_text[cut_off] == ".":
+                    cut_off += 1
+
             clean_text = (
-                clean_text[:15000] + "\n\n[Content truncated due to length limits...]"
+                clean_text[:cut_off].strip()
+                + "\n\n[Content truncated due to length limits...]"
             )
 
         return {"status": "success", "title": title, "text": clean_text}
