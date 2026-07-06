@@ -134,7 +134,7 @@ async def analyze_discourse(payload: AnalysisRequest):
                     role="user", parts=[types.Part.from_text(text=input_text)]
                 ),
             ):
-                if event.author:
+                if event.author and event.is_final_response():
                     logger.info(f"[{event.author}] Event generated (SSE)")
                     
                     # Fetch session state for the partial result
