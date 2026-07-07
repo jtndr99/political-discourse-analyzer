@@ -1147,6 +1147,8 @@
                     foucault_metrics: {}
                 };
                 
+                let isComplete = false;
+                
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
@@ -1158,9 +1160,14 @@
                     for (const line of lines) {
                         if (line.startsWith("data: ")) {
                             const rawData = line.substring(6);
+                            let parsed = null;
                             try {
-                                const parsed = JSON.parse(rawData);
-                                
+                                parsed = JSON.parse(rawData);
+                            } catch (err) {
+                                console.error("Error parsing stream chunk:", err, "Raw line:", line);
+                            }
+                            
+                            if (parsed) {
                                 if (parsed.event === "start") {
                                     accumulatedData.session_id = parsed.session_id;
                                     setStepState(1, "active");
@@ -1193,6 +1200,7 @@
                                     accumulatedData.title = parsed.data.title;
                                     accumulatedData.summary = parsed.data.summary;
                                 } else if (parsed.event === "complete") {
+                                    isComplete = true;
                                     // Done! Display the report
                                     setTimeout(() => {
                                         loadingContainer.style.display = "none";
@@ -1203,11 +1211,13 @@
                                 } else if (parsed.event === "error") {
                                     throw new Error(parsed.message);
                                 }
-                            } catch (err) {
-                                console.error("Error parsing stream chunk:", err, "Raw line:", line);
                             }
                         }
                     }
+                }
+                
+                if (!isComplete) {
+                    throw new Error("Stream closed prematurely by server.");
                 }
             } catch (e) {
                 alert("Analysis failed: " + e.message);
