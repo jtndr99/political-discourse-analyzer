@@ -134,8 +134,13 @@ async def analyze_discourse(payload: AnalysisRequest):
                     role="user", parts=[types.Part.from_text(text=input_text)]
                 ),
             ):
-                if event.author and event.is_final_response():
-                    logger.info(f"[{event.author}] Event generated (SSE)")
+                # Retrieve the active node name from path if running inside a workflow
+                node_name = event.author
+                if event.node_info and event.node_info.path:
+                    node_name = event.node_info.path.split("/")[-1].split("@")[0]
+
+                if node_name and event.is_final_response():
+                    logger.info(f"[{node_name}] Event generated (SSE)")
                     
                     # Fetch session state for the partial result
                     session = await session_service.get_session(
@@ -146,30 +151,30 @@ async def analyze_discourse(payload: AnalysisRequest):
                     event_type = None
                     payload_data = {}
                     
-                    if event.author == "InputAgent":
+                    if node_name == "InputAgent":
                         event_type = "input_processed"
                         payload_data = {"text": state.get("article_text", "")}
-                    elif event.author == "ParetoAnalyst":
+                    elif node_name == "ParetoAnalyst":
                         event_type = "pareto_completed"
                         pareto_raw = state.get("pareto_analysis", "")
                         pareto_md, pareto_metrics = parse_analyst_output(pareto_raw)
                         payload_data = {"analysis": pareto_md, "metrics": pareto_metrics}
-                    elif event.author == "SowellAnalyst":
+                    elif node_name == "SowellAnalyst":
                         event_type = "sowell_completed"
                         sowell_raw = state.get("sowell_analysis", "")
                         sowell_md, sowell_metrics = parse_analyst_output(sowell_raw)
                         payload_data = {"analysis": sowell_md, "metrics": sowell_metrics}
-                    elif event.author == "MassPsychAnalyst":
+                    elif node_name == "MassPsychAnalyst":
                         event_type = "mass_psych_completed"
                         mass_psych_raw = state.get("mass_psych_analysis", "")
                         mass_psych_md, mass_psych_metrics = parse_analyst_output(mass_psych_raw)
                         payload_data = {"analysis": mass_psych_md, "metrics": mass_psych_metrics}
-                    elif event.author == "FoucaultAnalyst":
+                    elif node_name == "FoucaultAnalyst":
                         event_type = "foucault_completed"
                         foucault_raw = state.get("foucault_analysis", "")
                         foucault_md, foucault_metrics = parse_analyst_output(foucault_raw)
                         payload_data = {"analysis": foucault_md, "metrics": foucault_metrics}
-                    elif event.author == "Synthesizer":
+                    elif node_name == "Synthesizer":
                         event_type = "synthesis_completed"
                         final_report = state.get("final_report", "No final report generated.")
                         

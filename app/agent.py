@@ -2,10 +2,12 @@ import os
 from pydantic import BaseModel
 
 from dotenv import load_dotenv
-from google.adk.agents import Agent, SequentialAgent
+from google.adk.agents import Agent
 from google.adk.apps import App
 from google.adk.models import Gemini
 from google.genai import types
+from google.adk.workflow import Workflow, node, START
+from google.adk.agents.context import Context
 
 from app.mcp_client import get_mcp_toolset
 from app.tools import fetch_web_page
@@ -64,7 +66,6 @@ mcp_toolset = get_mcp_toolset()
 MODEL_NAME = "gemini-3.1-flash-lite"
 DEFAULT_GEN_CONFIG = types.GenerateContentConfig(temperature=0.0)
 SYNTHESIZER_GEN_CONFIG = types.GenerateContentConfig(temperature=0.3)
-
 
 
 def get_model():
@@ -140,18 +141,42 @@ def create_synthesizer() -> Agent:
         generate_content_config=SYNTHESIZER_GEN_CONFIG,
     )
 
+# Define individual agent instances for the workflow
+input_agent = create_input_agent()
+pareto_analyst = create_pareto_analyst()
+sowell_analyst = create_sowell_analyst()
+mass_psych_analyst = create_mass_psych_analyst()
+foucault_analyst = create_foucault_analyst()
+synthesizer = create_synthesizer()
 
-# Wire the sub-agents together sequentially to prevent API free-tier rate limits
-root_agent = SequentialAgent(
+# Define the classification node for early-stopping
+@node(name="classify_input")
+async def classify_input_node(ctx: Context, article_text: str) -> str:
+    # Check if the input agent outputted OUT_OF_SCOPE tag
+    if "[OUT_OF_SCOPE]" in article_text:
+        ctx.route = "out_of_scope"
+    else:
+        ctx.route = "in_scope"
+    return article_text
+
+# Define workflow graph edges
+edges = [
+    (START, input_agent),
+    (input_agent, classify_input_node),
+    (classify_input_node, {
+        "in_scope": pareto_analyst,
+        "out_of_scope": synthesizer
+    }),
+    (pareto_analyst, sowell_analyst),
+    (sowell_analyst, mass_psych_analyst),
+    (mass_psych_analyst, foucault_analyst),
+    (foucault_analyst, synthesizer)
+]
+
+# Create the graph-based Workflow
+root_agent = Workflow(
     name="political_analysis_pipeline",
-    sub_agents=[
-        create_input_agent(),
-        create_pareto_analyst(),
-        create_sowell_analyst(),
-        create_mass_psych_analyst(),
-        create_foucault_analyst(),
-        create_synthesizer(),
-    ],
+    edges=edges,
 )
 
 # Export the app

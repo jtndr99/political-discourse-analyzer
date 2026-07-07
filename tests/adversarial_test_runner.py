@@ -96,7 +96,7 @@ async def mock_global_generate_content_async(self, llm_request, stream=False):
         
     if simulate_rate_limit:
         logger.info("[Mock LLM] Simulating rate limit (APIError 429)...")
-        raise APIError(message="Resource has been exhausted (queries per minute limit exceeded).", code=429)
+        raise APIError("Resource has been exhausted (queries per minute limit exceeded).", code=429)
         
     if simulate_timeout:
         logger.info("[Mock LLM] Simulating timeout (sleep 5s)...")
@@ -1009,7 +1009,7 @@ async def test_concurrency_and_performance(server_process):
     async def fire_req(idx, input_str):
         payload = {"input_text": f"[Adversarial Test] Concurrency request {idx}: {input_str}"}
         try:
-            resp = await client.post("http://127.0.0.1:8000/analyze", json=payload)
+            resp = await client.post("http://127.0.0.1:8088/analyze", json=payload)
             return idx, resp.status_code, resp.text
         except Exception as err:
             return idx, 500, str(err)
@@ -1169,7 +1169,7 @@ async def main():
     # 1. Start the FastAPI server in background thread
     logger.info("Starting local web server in background thread...")
     def start_uvicorn():
-        uvicorn.run(fastapi_app, host="127.0.0.1", port=8000, log_level="warning")
+        uvicorn.run(fastapi_app, host="127.0.0.1", port=8088, log_level="warning")
         
     server_thread = threading.Thread(target=start_uvicorn, daemon=True)
     server_thread.start()
