@@ -48,6 +48,7 @@ def parse_analyst_output(output_raw):
     Returns a tuple of (analysis_md, metrics_dict).
     """
     import json
+
     analysis_md = str(output_raw)
     metrics = {}
 
@@ -63,7 +64,9 @@ def parse_analyst_output(output_raw):
             logger.error(f"Failed to dump analyst Pydantic model: {e}")
     elif isinstance(output_raw, str) and output_raw.strip():
         # Strip markdown JSON wrappers if present
-        cleaned_str = re.sub(r"^```json\s*|\s*```$", "", output_raw.strip(), flags=re.MULTILINE)
+        cleaned_str = re.sub(
+            r"^```json\s*|\s*```$", "", output_raw.strip(), flags=re.MULTILINE
+        )
         # Try to parse as JSON first
         try:
             parsed = json.loads(cleaned_str)
@@ -82,6 +85,7 @@ def get_db_value(raw_val):
     Otherwise, returns the string representation as is.
     """
     import json
+
     if isinstance(raw_val, dict):
         return json.dumps(raw_val)
     elif hasattr(raw_val, "model_dump"):
@@ -113,11 +117,11 @@ async def analyze_discourse(payload: AnalysisRequest):
 
     # Initialize ADK runner and session service
     session_service = InMemorySessionService()
-    session = await session_service.create_session(
+    await session_service.create_session(
         app_name=app_name,
         user_id=user_id,
         session_id=session_id,
-        state={"user_input": input_text}
+        state={"user_input": input_text, "raw_input_text": input_text},
     )
     runner = Runner(
         agent=root_agent, app_name=app_name, session_service=session_service
@@ -125,6 +129,7 @@ async def analyze_discourse(payload: AnalysisRequest):
 
     async def event_generator():
         import json
+
         try:
             # Yield start event
             yield f"data: {json.dumps({'event': 'start', 'session_id': session_id})}\n\n"
@@ -144,27 +149,29 @@ async def analyze_discourse(payload: AnalysisRequest):
 
                 if node_name and event.is_final_response():
                     logger.info(f"[{node_name}] Event generated (SSE)")
-                    
+
                     # Fetch session state for the partial result
                     session = await session_service.get_session(
                         app_name=app_name, user_id=user_id, session_id=session_id
                     )
                     state = session.state
-                    
+
                     event_type = None
                     payload_data = {}
-                    
-                    if node_name == "InputResolver":
+
+                    if node_name == "tag_article":
                         event_type = "input_processed"
-                        payload_data = {"text": state.get("raw_content", "")}
-                    elif node_name == "InputClassifier":
+                        payload_data = {"text": state.get("article_text", "")}
+                    elif node_name == "ScopeClassifier":
                         event_type = "input_classified"
-                        classification = state.get("input_classification", {})
+                        classification = state.get("scope_classification", {})
                         if isinstance(classification, str):
                             classification = {}
                         payload_data = {
-                            "is_out_of_scope": classification.get("is_out_of_scope", False),
-                            "is_satire": classification.get("is_satire", False)
+                            "is_out_of_scope": classification.get(
+                                "is_out_of_scope", False
+                            ),
+                            "is_satire": classification.get("is_satire", False),
                         }
                     elif node_name == "SecurityAuditor":
                         event_type = "security_completed"
@@ -174,28 +181,44 @@ async def analyze_discourse(payload: AnalysisRequest):
                         payload_data = {
                             "is_safe": security.get("is_safe", True),
                             "risk_score": security.get("risk_score", 0),
-                            "reason": security.get("reason", "Input is safe")
+                            "reason": security.get("reason", "Input is safe"),
                         }
                     elif node_name == "ParetoAnalyst":
                         event_type = "pareto_completed"
                         pareto_raw = state.get("pareto_analysis", "")
                         pareto_md, pareto_metrics = parse_analyst_output(pareto_raw)
-                        payload_data = {"analysis": pareto_md, "metrics": pareto_metrics}
+                        payload_data = {
+                            "analysis": pareto_md,
+                            "metrics": pareto_metrics,
+                        }
                     elif node_name == "SowellAnalyst":
                         event_type = "sowell_completed"
                         sowell_raw = state.get("sowell_analysis", "")
                         sowell_md, sowell_metrics = parse_analyst_output(sowell_raw)
-                        payload_data = {"analysis": sowell_md, "metrics": sowell_metrics}
+                        payload_data = {
+                            "analysis": sowell_md,
+                            "metrics": sowell_metrics,
+                        }
                     elif node_name == "MassPsychAnalyst":
                         event_type = "mass_psych_completed"
                         mass_psych_raw = state.get("mass_psych_analysis", "")
-                        mass_psych_md, mass_psych_metrics = parse_analyst_output(mass_psych_raw)
-                        payload_data = {"analysis": mass_psych_md, "metrics": mass_psych_metrics}
+                        mass_psych_md, mass_psych_metrics = parse_analyst_output(
+                            mass_psych_raw
+                        )
+                        payload_data = {
+                            "analysis": mass_psych_md,
+                            "metrics": mass_psych_metrics,
+                        }
                     elif node_name == "FoucaultAnalyst":
                         event_type = "foucault_completed"
                         foucault_raw = state.get("foucault_analysis", "")
-                        foucault_md, foucault_metrics = parse_analyst_output(foucault_raw)
-                        payload_data = {"analysis": foucault_md, "metrics": foucault_metrics}
+                        foucault_md, foucault_metrics = parse_analyst_output(
+                            foucault_raw
+                        )
+                        payload_data = {
+                            "analysis": foucault_md,
+                            "metrics": foucault_metrics,
+                        }
                     elif node_name == "GroundingEvaluator":
                         event_type = "grounding_completed"
                         evaluation = state.get("grounding_evaluation", {})
@@ -205,12 +228,16 @@ async def analyze_discourse(payload: AnalysisRequest):
                             "is_grounded": evaluation.get("is_grounded", True),
                             "grounding_score": evaluation.get("grounding_score", 100),
                             "feedback": evaluation.get("feedback", ""),
-                            "hallucinated_elements": evaluation.get("hallucinated_elements", [])
+                            "hallucinated_elements": evaluation.get(
+                                "hallucinated_elements", []
+                            ),
                         }
                     elif node_name == "Synthesizer":
                         event_type = "synthesis_completed"
-                        final_report = state.get("final_report", "No final report generated.")
-                        
+                        final_report = state.get(
+                            "final_report", "No final report generated."
+                        )
+
                         # Programmatically parse title, summary, and report_md from final_report
                         title = "Discourse Analysis"
                         summary = ""
@@ -227,21 +254,35 @@ async def analyze_discourse(payload: AnalysisRequest):
                                 summary = report_dict.get("summary", summary)
                                 report_md = report_dict.get("report_md", report_md)
                             except Exception as e:
-                                logger.error(f"Failed to dump Pydantic model in SSE: {e}")
+                                logger.error(
+                                    f"Failed to dump Pydantic model in SSE: {e}"
+                                )
                         elif isinstance(final_report, str):
-                            cleaned_report = re.sub(r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE)
+                            cleaned_report = re.sub(
+                                r"^```json\s*|\s*```$",
+                                "",
+                                final_report.strip(),
+                                flags=re.MULTILINE,
+                            )
                             try:
                                 report_data = json.loads(cleaned_report)
                                 title = report_data.get("title", title)
                                 summary = report_data.get("summary", summary)
                                 report_md = report_data.get("report_md", report_md)
                             except Exception as e:
-                                logger.info(f"Synthesizer output is not JSON, treating as raw markdown: {e}")
+                                logger.info(
+                                    f"Synthesizer output is not JSON, treating as raw markdown: {e}"
+                                )
                                 report_md = final_report
                                 lines = final_report.strip().split("\n")
                                 for line in lines:
                                     if line.startswith("# "):
-                                        title = line[2:].strip().replace("*", "").replace("_", "")
+                                        title = (
+                                            line[2:]
+                                            .strip()
+                                            .replace("*", "")
+                                            .replace("_", "")
+                                        )
                                         break
 
                                 lower_report = final_report.lower()
@@ -249,7 +290,9 @@ async def analyze_discourse(payload: AnalysisRequest):
                                 for keyword in ["executive summary", "summary"]:
                                     summary_idx = lower_report.find(keyword)
                                     if summary_idx != -1:
-                                        summary_text = final_report[summary_idx + len(keyword):].strip()
+                                        summary_text = final_report[
+                                            summary_idx + len(keyword) :
+                                        ].strip()
                                         summary_text = summary_text.lstrip(":- \t\r\n")
                                         end_idx = len(summary_text)
                                         for term in ["\n\n", "\n#", "\n*"]:
@@ -259,25 +302,30 @@ async def analyze_discourse(payload: AnalysisRequest):
                                         summary = summary_text[:end_idx].strip()
                                         break
                                 if not summary:
-                                    content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
+                                    content_lines = [
+                                        line.strip()
+                                        for line in lines
+                                        if line.strip()
+                                        and not line.startswith(("#", ">", "*", "-"))
+                                    ]
                                     if content_lines:
                                         summary = " ".join(content_lines[:2])
                                         if len(summary) > 200:
                                             summary = summary[:197] + "..."
                         else:
                             report_md = str(final_report)
-                            
+
                         payload_data = {
                             "title": title,
                             "summary": summary,
-                            "report_md": report_md
+                            "report_md": report_md,
                         }
-                    
+
                     if event_type:
                         sse_msg = {
                             "event": event_type,
                             "session_id": session_id,
-                            "data": payload_data
+                            "data": payload_data,
                         }
                         yield f"data: {json.dumps(sse_msg)}\n\n"
 
@@ -286,10 +334,10 @@ async def analyze_discourse(payload: AnalysisRequest):
                 app_name=app_name, user_id=user_id, session_id=session_id
             )
             state = session.state
-            
+
             final_report = state.get("final_report", "No final report generated.")
-            original_text = state.get("raw_content", input_text)
-            
+            original_text = state.get("article_text", input_text)
+
             pareto_raw = state.get("pareto_analysis", "")
             sowell_raw = state.get("sowell_analysis", "")
             mass_psych_raw = state.get("mass_psych_analysis", "")
@@ -313,7 +361,9 @@ async def analyze_discourse(payload: AnalysisRequest):
                 except Exception:
                     pass
             elif isinstance(final_report, str):
-                cleaned_report = re.sub(r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE)
+                cleaned_report = re.sub(
+                    r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE
+                )
                 try:
                     report_data = json.loads(cleaned_report)
                     title = report_data.get("title", title)
@@ -332,7 +382,9 @@ async def analyze_discourse(payload: AnalysisRequest):
                     for keyword in ["executive summary", "summary"]:
                         summary_idx = lower_report.find(keyword)
                         if summary_idx != -1:
-                            summary_text = final_report[summary_idx + len(keyword):].strip()
+                            summary_text = final_report[
+                                summary_idx + len(keyword) :
+                            ].strip()
                             summary_text = summary_text.lstrip(":- \t\r\n")
                             end_idx = len(summary_text)
                             for term in ["\n\n", "\n#", "\n*"]:
@@ -342,7 +394,12 @@ async def analyze_discourse(payload: AnalysisRequest):
                             summary = summary_text[:end_idx].strip()
                             break
                     if not summary:
-                        content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
+                        content_lines = [
+                            line.strip()
+                            for line in lines
+                            if line.strip()
+                            and not line.startswith(("#", ">", "*", "-"))
+                        ]
                         if content_lines:
                             summary = " ".join(content_lines[:2])
                             if len(summary) > 200:
@@ -369,7 +426,9 @@ async def analyze_discourse(payload: AnalysisRequest):
                 db_id = cursor.lastrowid
                 conn.commit()
                 conn.close()
-                logger.info(f"Successfully saved analysis report {db_id} to SQLite database programmatically.")
+                logger.info(
+                    f"Successfully saved analysis report {db_id} to SQLite database programmatically."
+                )
             except Exception as e:
                 logger.error(f"Failed to save analysis report to database: {e}")
 
@@ -465,7 +524,9 @@ async def delete_report(report_id: int):
         cursor.execute("DELETE FROM analyses WHERE id = ?", (report_id,))
         conn.commit()
         conn.close()
-        return JSONResponse(content={"status": "success", "message": f"Report {report_id} deleted."})
+        return JSONResponse(
+            content={"status": "success", "message": f"Report {report_id} deleted."}
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
