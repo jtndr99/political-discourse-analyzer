@@ -198,14 +198,6 @@ async def classify_input_node(ctx: Context, article_text: str, security_evaluati
         ctx.route = "in_scope"
     return article_text
 
-# Define the grounding classification node
-@node(name="classify_grounding")
-async def classify_grounding_node(ctx: Context, grounding_evaluation: dict) -> dict:
-    is_grounded = grounding_evaluation.get("is_grounded", True)
-    # Always route to synthesis path; state grounding_evaluation will differentiate
-    ctx.route = "synthesis"
-    return grounding_evaluation
-
 # Define workflow graph edges
 edges = [
     (START, input_agent),
@@ -219,10 +211,7 @@ edges = [
     (sowell_analyst, mass_psych_analyst),
     (mass_psych_analyst, foucault_analyst),
     (foucault_analyst, grounding_evaluator),
-    (grounding_evaluator, classify_grounding_node),
-    (classify_grounding_node, {
-        "synthesis": synthesizer
-    })
+    (grounding_evaluator, synthesizer)
 ]
 
 # Create the graph-based Workflow
