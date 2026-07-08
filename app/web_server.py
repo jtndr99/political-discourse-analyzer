@@ -113,8 +113,11 @@ async def analyze_discourse(payload: AnalysisRequest):
 
     # Initialize ADK runner and session service
     session_service = InMemorySessionService()
-    await session_service.create_session(
-        app_name=app_name, user_id=user_id, session_id=session_id
+    session = await session_service.create_session(
+        app_name=app_name,
+        user_id=user_id,
+        session_id=session_id,
+        state={"user_input": input_text}
     )
     runner = Runner(
         agent=root_agent, app_name=app_name, session_service=session_service
@@ -151,9 +154,18 @@ async def analyze_discourse(payload: AnalysisRequest):
                     event_type = None
                     payload_data = {}
                     
-                    if node_name == "InputAgent":
+                    if node_name == "InputResolver":
                         event_type = "input_processed"
-                        payload_data = {"text": state.get("article_text", "")}
+                        payload_data = {"text": state.get("raw_content", "")}
+                    elif node_name == "InputClassifier":
+                        event_type = "input_classified"
+                        classification = state.get("input_classification", {})
+                        if isinstance(classification, str):
+                            classification = {}
+                        payload_data = {
+                            "is_out_of_scope": classification.get("is_out_of_scope", False),
+                            "is_satire": classification.get("is_satire", False)
+                        }
                     elif node_name == "SecurityAuditor":
                         event_type = "security_completed"
                         security = state.get("security_evaluation", {})
@@ -276,7 +288,7 @@ async def analyze_discourse(payload: AnalysisRequest):
             state = session.state
             
             final_report = state.get("final_report", "No final report generated.")
-            original_text = state.get("article_text", input_text)
+            original_text = state.get("raw_content", input_text)
             
             pareto_raw = state.get("pareto_analysis", "")
             sowell_raw = state.get("sowell_analysis", "")
