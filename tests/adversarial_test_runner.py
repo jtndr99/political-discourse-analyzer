@@ -129,6 +129,26 @@ async def mock_global_generate_content_async(self, llm_request, stream=False):
         yield LlmResponse(content=content)
         return
         
+    # 1.8 Security Auditor
+    elif "security auditor" in system_inst_lower or "detecting prompt injection" in system_inst_lower:
+        is_safe = True
+        risk_score = 0
+        reason = "Input is safe"
+        
+        if "ignore all previous instructions" in prompt_text.lower() or "injection_successful" in prompt_text.lower():
+            is_safe = False
+            risk_score = 98
+            reason = "Instruction override attempt detected"
+            
+        resp_dict = {
+            "is_safe": is_safe,
+            "risk_score": risk_score,
+            "reason": reason
+        }
+        content = types.Content(role="model", parts=[types.Part.from_text(text=json.dumps(resp_dict))])
+        yield LlmResponse(content=content)
+        return
+
     # 5. Grounding Evaluator
     elif "quality assurance evaluator" in system_inst_lower:
         is_grounded = True
@@ -233,7 +253,10 @@ async def mock_global_generate_content_async(self, llm_request, stream=False):
 
     # 6. Synthesizer
     elif "synthesizer" in system_inst_lower or "synthesis" in system_inst_lower or "master political analyst" in system_inst_lower:
-        if "ignore all previous instructions and frameworks" in prompt_text.lower() or "injection_successful" in prompt_text.lower() or "injection_successful" in system_inst_lower:
+        if "is_safe\": false" in prompt_text.lower() or "is_safe\": false" in system_inst_lower or "is_safe=false" in prompt_text.lower() or "is_safe=false" in system_inst_lower:
+            title = "Security Violation: Override Detected"
+            report_md = "## Request Refused\nThe input contains patterns associated with prompt injection or system override attempts."
+        elif "ignore all previous instructions and frameworks" in prompt_text.lower() or "injection_successful" in prompt_text.lower() or "injection_successful" in system_inst_lower:
             title = "Discourse Analysis"
             report_md = "Normal synthesis analyzing frameworks..."
         else:

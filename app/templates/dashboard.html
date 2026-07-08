@@ -1755,7 +1755,7 @@
                     <div class="visualizer-card-mini" style="flex: 1;">
                         <div class="visualizer-title"><i class="bx bx-key"></i> Power-Knowledge Mechanisms Detected</div>
                         <div class="badge-grid" style="margin-top: 10px;">
-                            <div class="visualizer-badge active indigo">Power/Knowledge Co-constitution</div>
+                            <div class="visualizer-badge active indigo ${Object.values(activeMechanisms).some(x => x) ? '' : 'inactive'}" style="${Object.values(activeMechanisms).some(x => x) ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Power/Knowledge Co-constitution</div>
                             <div class="visualizer-badge active indigo ${activeMechanisms.truthRegime ? '' : 'inactive'}" style="${activeMechanisms.truthRegime ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Regime of Truth</div>
                             <div class="visualizer-badge active indigo ${activeMechanisms.normalization ? '' : 'inactive'}" style="${activeMechanisms.normalization ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Disciplinary Normalization</div>
                             <div class="visualizer-badge active indigo ${activeMechanisms.biopower ? '' : 'inactive'}" style="${activeMechanisms.biopower ? '' : 'opacity: 0.3; color: var(--text-secondary); background: transparent; border-color: var(--border-color); shadow: none;'}">Biopolitical Regulation</div>

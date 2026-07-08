@@ -19,6 +19,7 @@ from app.prompts import (
     FOUCAULT_ANALYST_INSTRUCTION,
     SYNTHESIZER_INSTRUCTION,
     GROUNDING_EVALUATOR_INSTRUCTION,
+    SECURITY_AUDITOR_INSTRUCTION,
 )
 
 class SynthesisReport(BaseModel):
@@ -51,6 +52,11 @@ class GroundingEvaluationSchema(BaseModel):
     grounding_score: int
     feedback: str
     hallucinated_elements: list[str]
+
+class SecurityEvaluationSchema(BaseModel):
+    is_safe: bool
+    risk_score: int
+    reason: str
 
 # Load local environment variables from .env
 load_dotenv()
@@ -86,6 +92,17 @@ def create_input_agent() -> Agent:
         instruction=INPUT_AGENT_INSTRUCTION,
         tools=[fetch_web_page],
         output_key="article_text",
+        generate_content_config=DEFAULT_GEN_CONFIG,
+    )
+
+
+def create_security_auditor() -> Agent:
+    return Agent(
+        name="SecurityAuditor",
+        model=get_model(),
+        instruction=SECURITY_AUDITOR_INSTRUCTION,
+        output_key="security_evaluation",
+        output_schema=SecurityEvaluationSchema,
         generate_content_config=DEFAULT_GEN_CONFIG,
     )
 
@@ -161,6 +178,7 @@ def create_synthesizer() -> Agent:
 
 # Define individual agent instances for the workflow
 input_agent = create_input_agent()
+security_auditor = create_security_auditor()
 pareto_analyst = create_pareto_analyst()
 sowell_analyst = create_sowell_analyst()
 mass_psych_analyst = create_mass_psych_analyst()
@@ -170,9 +188,11 @@ synthesizer = create_synthesizer()
 
 # Define the classification node for early-stopping
 @node(name="classify_input")
-async def classify_input_node(ctx: Context, article_text: str) -> str:
-    # Check if the input agent outputted OUT_OF_SCOPE or SATIRE tag
-    if "[OUT_OF_SCOPE]" in article_text or "[SATIRE]" in article_text:
+async def classify_input_node(ctx: Context, article_text: str, security_evaluation: dict) -> str:
+    # 1. Security Check
+    is_safe = security_evaluation.get("is_safe", True)
+    # 2. Out of Scope/Satire Check
+    if not is_safe or "[OUT_OF_SCOPE]" in article_text or "[SATIRE]" in article_text:
         ctx.route = "skip_analysts"
     else:
         ctx.route = "in_scope"
@@ -189,7 +209,8 @@ async def classify_grounding_node(ctx: Context, grounding_evaluation: dict) -> d
 # Define workflow graph edges
 edges = [
     (START, input_agent),
-    (input_agent, classify_input_node),
+    (input_agent, security_auditor),
+    (security_auditor, classify_input_node),
     (classify_input_node, {
         "in_scope": pareto_analyst,
         "skip_analysts": synthesizer

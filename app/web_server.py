@@ -154,6 +154,16 @@ async def analyze_discourse(payload: AnalysisRequest):
                     if node_name == "InputAgent":
                         event_type = "input_processed"
                         payload_data = {"text": state.get("article_text", "")}
+                    elif node_name == "SecurityAuditor":
+                        event_type = "security_completed"
+                        security = state.get("security_evaluation", {})
+                        if isinstance(security, str):
+                            security = {}
+                        payload_data = {
+                            "is_safe": security.get("is_safe", True),
+                            "risk_score": security.get("risk_score", 0),
+                            "reason": security.get("reason", "Input is safe")
+                        }
                     elif node_name == "ParetoAnalyst":
                         event_type = "pareto_completed"
                         pareto_raw = state.get("pareto_analysis", "")
