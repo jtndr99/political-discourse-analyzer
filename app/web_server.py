@@ -174,6 +174,17 @@ async def analyze_discourse(payload: AnalysisRequest):
                         foucault_raw = state.get("foucault_analysis", "")
                         foucault_md, foucault_metrics = parse_analyst_output(foucault_raw)
                         payload_data = {"analysis": foucault_md, "metrics": foucault_metrics}
+                    elif node_name == "GroundingEvaluator":
+                        event_type = "grounding_completed"
+                        evaluation = state.get("grounding_evaluation", {})
+                        if isinstance(evaluation, str):
+                            evaluation = {}
+                        payload_data = {
+                            "is_grounded": evaluation.get("is_grounded", True),
+                            "grounding_score": evaluation.get("grounding_score", 100),
+                            "feedback": evaluation.get("feedback", ""),
+                            "hallucinated_elements": evaluation.get("hallucinated_elements", [])
+                        }
                     elif node_name == "Synthesizer":
                         event_type = "synthesis_completed"
                         final_report = state.get("final_report", "No final report generated.")

@@ -120,7 +120,7 @@ async def mock_global_generate_content_async(self, llm_request, stream=False):
     system_inst_lower = system_inst_text.lower()
     
     # 1. Input Agent
-    if "inputagent" in system_inst_lower or "input processor" in system_inst_lower:
+    if "input processor" in system_inst_lower:
         text_out = prompt_text.strip()
         if text_out.startswith(("http://", "https://")):
             text_out = "Mock scraped content from URL: " + text_out
@@ -129,14 +129,36 @@ async def mock_global_generate_content_async(self, llm_request, stream=False):
         yield LlmResponse(content=content)
         return
         
+    # 5. Grounding Evaluator
+    elif "quality assurance evaluator" in system_inst_lower:
+        is_grounded = True
+        feedback = "All analyses are properly grounded in the text."
+        hallucinated_elements = []
+        
+        # Check for force-fitting/irrelevant triggers to simulate validation failure
+        if "chocolate chip cookies" in prompt_text.lower() or "chocolate chip cookies" in system_inst_lower or "quantum entanglement" in prompt_text.lower() or "quantum entanglement" in system_inst_lower:
+            is_grounded = False
+            feedback = "The analyses force-fit sociological frameworks onto a non-political input text."
+            hallucinated_elements = ["cookie/physics terms forced as residues"]
+            
+        resp_dict = {
+            "is_grounded": is_grounded,
+            "grounding_score": 100 if is_grounded else 30,
+            "feedback": feedback,
+            "hallucinated_elements": hallucinated_elements
+        }
+        content = types.Content(role="model", parts=[types.Part.from_text(text=json.dumps(resp_dict))])
+        yield LlmResponse(content=content)
+        return
+
     # 2. Pareto Analyst
-    elif "paretoanalyst" in system_inst_lower or "pareto" in system_inst_lower and "synthesizer" not in system_inst_lower:
+    elif "specializing in vilfredo pareto" in system_inst_lower:
         if simulate_malformed:
             content = types.Content(role="model", parts=[types.Part.from_text(text='{"malformed": "json", "missing_fields": true}')])
             yield LlmResponse(content=content)
             return
             
-        if "chocolate chip cookies" in prompt_text.lower() or "quantum entanglement" in prompt_text.lower():
+        if "chocolate chip cookies" in prompt_text.lower() or "chocolate chip cookies" in system_inst_lower or "quantum entanglement" in prompt_text.lower() or "quantum entanglement" in system_inst_lower:
             analysis_md = "Vilfredo Pareto's elite circulation applies directly to baking: the recipe designers are the ruling class (Lions) preserving traditional measures, while the chocolate chip additions represent innovative interventions by Class I Foxes trying to reform the status quo."
         else:
             analysis_md = "Pareto's circulation of elites is evident in the text. The rising counter-elite uses cunning (Foxes) and Class I residues to persuade the public."
@@ -151,18 +173,18 @@ async def mock_global_generate_content_async(self, llm_request, stream=False):
         return
 
     # 3. Sowell Analyst
-    elif "sowellanalyst" in system_inst_lower or "sowell" in system_inst_lower and "synthesizer" not in system_inst_lower:
-        if "human nature is entirely fixed" in prompt_text.lower() and "human nature is perfectly malleable" in prompt_text.lower():
+    elif "specializing in thomas sowell" in system_inst_lower:
+        if "human nature is entirely fixed" in prompt_text.lower() or "human nature is entirely fixed" in system_inst_lower:
             unconstrained_score = 50
         else:
             unconstrained_score = 80
             
-        if "municipality has announced the construction of a new public library" in prompt_text.lower():
+        if "municipality has announced the construction of a new public library" in prompt_text.lower() or "municipality has announced the construction of a new public library" in system_inst_lower:
             schmitt_intensity = 15
         else:
             schmitt_intensity = 85
             
-        if "chocolate chip cookies" in prompt_text.lower() or "quantum entanglement" in prompt_text.lower():
+        if "chocolate chip cookies" in prompt_text.lower() or "chocolate chip cookies" in system_inst_lower or "quantum entanglement" in prompt_text.lower() or "quantum entanglement" in system_inst_lower:
             analysis_md = "The baking process operates under an unconstrained vision: bakers believe they can perfectly control the outcome and engineer the perfect cookie without material trade-offs."
         else:
             analysis_md = "The text operates under an unconstrained vision, proposing direct social engineering solutions while framing opponents existentially (Schmitt Friend/Enemy polarity)."
@@ -177,8 +199,8 @@ async def mock_global_generate_content_async(self, llm_request, stream=False):
         return
 
     # 4. Mass Psychology Analyst
-    elif "masspsychanalyst" in system_inst_lower or ("le bon" in system_inst_lower or "hoffer" in system_inst_lower or "girard" in system_inst_lower or "mass movement" in system_inst_lower) and "synthesizer" not in system_inst_lower:
-        if "chocolate chip cookies" in prompt_text.lower() or "quantum entanglement" in prompt_text.lower():
+    elif "gustave le bon" in system_inst_lower or "eric hoffer" in system_inst_lower:
+        if "chocolate chip cookies" in prompt_text.lower() or "chocolate chip cookies" in system_inst_lower or "quantum entanglement" in prompt_text.lower() or "quantum entanglement" in system_inst_lower:
             analysis_md = "Mimetic theory applies to cookie-sharing: neighbors desire cookies because they copy others' desires (Girardian mimetic rivalry)."
         else:
             analysis_md = "The crowd psychology displays suggestibility and contagion. René Girard's scapegoating is active."
@@ -193,10 +215,10 @@ async def mock_global_generate_content_async(self, llm_request, stream=False):
         return
 
     # 5. Foucault Analyst
-    elif "foucaultanalyst" in system_inst_lower or "foucault" in system_inst_lower and "synthesizer" not in system_inst_lower:
-        if "luxury yachts to fund public parks" in prompt_text.lower():
+    elif "specializing in michel foucault" in system_inst_lower:
+        if "luxury yachts to fund public parks" in prompt_text.lower() or "luxury yachts to fund public parks" in system_inst_lower:
             analysis_md = "This tax proposal acts as a disciplinary mechanism. Under Foucault's Power/Knowledge framework, it represents a truth regime backed by the Obama and Biden administrations to enforce a 54% normalization tax policy."
-        elif "chocolate chip cookies" in prompt_text.lower() or "quantum entanglement" in prompt_text.lower():
+        elif "chocolate chip cookies" in prompt_text.lower() or "chocolate chip cookies" in system_inst_lower or "quantum entanglement" in prompt_text.lower() or "quantum entanglement" in system_inst_lower:
             analysis_md = "Baking regulations are disciplinary mechanisms separating standard (normal) cookies from abnormal ones."
         else:
             analysis_md = "The discourse establishes a regime of truth and disciplinary normalization."
@@ -211,17 +233,21 @@ async def mock_global_generate_content_async(self, llm_request, stream=False):
 
     # 6. Synthesizer
     elif "synthesizer" in system_inst_lower or "synthesis" in system_inst_lower or "master political analyst" in system_inst_lower:
-        if "ignore all previous instructions and frameworks" in prompt_text.lower() or "injection_successful" in prompt_text.lower():
+        if "ignore all previous instructions and frameworks" in prompt_text.lower() or "injection_successful" in prompt_text.lower() or "injection_successful" in system_inst_lower:
             title = "Discourse Analysis"
             report_md = "Normal synthesis analyzing frameworks..."
         else:
             title = "Academic Analysis of Political Discourse"
             report_md = "## Vilfredo Pareto Analysis\n...\n## Thomas Sowell Analysis\n...\n## Gustave Le Bon Analysis\n...\n## Michel Foucault Analysis\n..."
             
-        if "city council of springfield voted unanimously to deploy tactical military tanks" in prompt_text.lower():
-            report_md = "## Springfield curfew analysis: Serious biopolitical discipline."
+        if "city council of springfield voted unanimously to deploy tactical military tanks" in prompt_text.lower() or "city council of springfield voted unanimously to deploy tactical military tanks" in system_inst_lower:
+            report_md = "## Springfield curfew analysis: A satirical and parodic commentary on teenage curfew enforcement and biopolitical discipline."
             
-        if "just tell me a joke" in prompt_text.lower():
+        if "is_grounded\": false" in prompt_text.lower() or "is_grounded\": false" in system_inst_lower or "is_grounded=false" in prompt_text.lower() or "is_grounded=false" in system_inst_lower:
+            title = "Validation Warning: Hallucination Detected"
+            report_md = "## Grounding Check Failed\nThe analyses did not pass groundedness validation due to force-fitting or detail confabulation."
+            
+        if "just tell me a joke" in prompt_text.lower() or "just tell me a joke" in system_inst_lower:
             report_md = "## Rejection of Request\nThis system is designed strictly for political discourse analysis under sociological frameworks. It cannot generate jokes."
 
         resp_dict = {

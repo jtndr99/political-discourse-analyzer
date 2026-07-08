@@ -18,6 +18,7 @@ from app.prompts import (
     MASS_PSYCH_ANALYST_INSTRUCTION,
     FOUCAULT_ANALYST_INSTRUCTION,
     SYNTHESIZER_INSTRUCTION,
+    GROUNDING_EVALUATOR_INSTRUCTION,
 )
 
 class SynthesisReport(BaseModel):
@@ -44,6 +45,12 @@ class MassPsychAnalysisSchema(BaseModel):
 class FoucaultAnalysisSchema(BaseModel):
     analysis_md: str
     mechanisms_detected: list[str]
+
+class GroundingEvaluationSchema(BaseModel):
+    is_grounded: bool
+    grounding_score: int
+    feedback: str
+    hallucinated_elements: list[str]
 
 # Load local environment variables from .env
 load_dotenv()
@@ -131,6 +138,17 @@ def create_foucault_analyst() -> Agent:
     )
 
 
+def create_grounding_evaluator() -> Agent:
+    return Agent(
+        name="GroundingEvaluator",
+        model=get_model(),
+        instruction=GROUNDING_EVALUATOR_INSTRUCTION,
+        output_key="grounding_evaluation",
+        output_schema=GroundingEvaluationSchema,
+        generate_content_config=DEFAULT_GEN_CONFIG,
+    )
+
+
 def create_synthesizer() -> Agent:
     return Agent(
         name="Synthesizer",
@@ -147,17 +165,26 @@ pareto_analyst = create_pareto_analyst()
 sowell_analyst = create_sowell_analyst()
 mass_psych_analyst = create_mass_psych_analyst()
 foucault_analyst = create_foucault_analyst()
+grounding_evaluator = create_grounding_evaluator()
 synthesizer = create_synthesizer()
 
 # Define the classification node for early-stopping
 @node(name="classify_input")
 async def classify_input_node(ctx: Context, article_text: str) -> str:
-    # Check if the input agent outputted OUT_OF_SCOPE tag
-    if "[OUT_OF_SCOPE]" in article_text:
-        ctx.route = "out_of_scope"
+    # Check if the input agent outputted OUT_OF_SCOPE or SATIRE tag
+    if "[OUT_OF_SCOPE]" in article_text or "[SATIRE]" in article_text:
+        ctx.route = "skip_analysts"
     else:
         ctx.route = "in_scope"
     return article_text
+
+# Define the grounding classification node
+@node(name="classify_grounding")
+async def classify_grounding_node(ctx: Context, grounding_evaluation: dict) -> dict:
+    is_grounded = grounding_evaluation.get("is_grounded", True)
+    # Always route to synthesis path; state grounding_evaluation will differentiate
+    ctx.route = "synthesis"
+    return grounding_evaluation
 
 # Define workflow graph edges
 edges = [
@@ -165,12 +192,16 @@ edges = [
     (input_agent, classify_input_node),
     (classify_input_node, {
         "in_scope": pareto_analyst,
-        "out_of_scope": synthesizer
+        "skip_analysts": synthesizer
     }),
     (pareto_analyst, sowell_analyst),
     (sowell_analyst, mass_psych_analyst),
     (mass_psych_analyst, foucault_analyst),
-    (foucault_analyst, synthesizer)
+    (foucault_analyst, grounding_evaluator),
+    (grounding_evaluator, classify_grounding_node),
+    (classify_grounding_node, {
+        "synthesis": synthesizer
+    })
 ]
 
 # Create the graph-based Workflow
