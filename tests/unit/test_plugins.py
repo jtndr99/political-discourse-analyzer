@@ -87,12 +87,16 @@ async def test_rate_limiter_plugin():
     llm_request = MagicMock()
 
     # 1st request should pass immediately and consume 1 token (2.0 -> 1.0)
-    res1 = await plugin.before_model_callback(callback_context=None, llm_request=llm_request)
+    res1 = await plugin.before_model_callback(
+        callback_context=None, llm_request=llm_request
+    )
     assert res1 is None
     assert plugin.tokens == pytest.approx(1.0, abs=1e-3)
 
     # 2nd request should pass immediately and consume 1 token (1.0 -> 0.0)
-    res2 = await plugin.before_model_callback(callback_context=None, llm_request=llm_request)
+    res2 = await plugin.before_model_callback(
+        callback_context=None, llm_request=llm_request
+    )
     assert res2 is None
     assert plugin.tokens == pytest.approx(0.0, abs=1e-3)
 
@@ -107,11 +111,10 @@ async def test_rate_limiter_plugin():
         plugin.last_update -= delay
 
     with patch("asyncio.sleep", side_effect=mock_sleep):
-        res3 = await plugin.before_model_callback(callback_context=None, llm_request=llm_request)
+        res3 = await plugin.before_model_callback(
+            callback_context=None, llm_request=llm_request
+        )
         assert res3 is None
         assert len(sleep_called_with) == 1
         # Throttler sleep delay must be approximately 30 seconds
         assert sleep_called_with[0] == pytest.approx(30.0, abs=1e-2)
-
-
-

@@ -119,18 +119,24 @@ class RateLimiterPlugin(BasePlugin):
             if self.tokens < 1.0:
                 # Calculate time to wait until we have at least 1 token
                 wait_time = (1.0 - self.tokens) / self.fill_rate
-                logger.info(f"RateLimiterPlugin: Throttling model request. Sleeping for {wait_time:.2f} seconds...")
+                logger.info(
+                    f"RateLimiterPlugin: Throttling model request. Sleeping for {wait_time:.2f} seconds..."
+                )
                 await asyncio.sleep(wait_time)
-                
+
                 # Update tokens after sleeping
                 now_after_sleep = time.monotonic()
                 elapsed_sleep = now_after_sleep - self.last_update
                 self.last_update = now_after_sleep
-                self.tokens = min(self.capacity, self.tokens + elapsed_sleep * self.fill_rate)
+                self.tokens = min(
+                    self.capacity, self.tokens + elapsed_sleep * self.fill_rate
+                )
 
             # Consume a token
             self.tokens -= 1.0
-            logger.info(f"RateLimiterPlugin: Request allowed. Tokens remaining: {self.tokens:.2f}/{self.capacity}")
+            logger.info(
+                f"RateLimiterPlugin: Request allowed. Tokens remaining: {self.tokens:.2f}/{self.capacity}"
+            )
             return None
 
 
