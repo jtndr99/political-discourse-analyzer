@@ -1065,6 +1065,7 @@
                     const div = document.createElement("div");
                     div.className = "history-item";
                     div.id = `history-item-${item.id}`;
+                    div.setAttribute("data-summary", item.summary ? item.summary.toLowerCase() : "");
                     div.onclick = () => loadSavedReport(item.id);
                     
                     const sourceText = item.source.startsWith("http") ? item.source : "Pasted Text";
@@ -1332,7 +1333,9 @@
             document.querySelectorAll(".history-item").forEach(item => {
                 const title = item.querySelector(".history-title").textContent.toLowerCase();
                 const source = item.querySelector(".history-meta").textContent.toLowerCase();
-                if (title.includes(query) || source.includes(query)) {
+                const summary = item.getAttribute("data-summary") || "";
+                
+                if (title.includes(query) || source.includes(query) || summary.includes(query)) {
                     item.style.display = "block";
                 } else {
                     item.style.display = "none";
