@@ -1333,9 +1333,8 @@
             document.querySelectorAll(".history-item").forEach(item => {
                 const title = item.querySelector(".history-title").textContent.toLowerCase();
                 const source = item.querySelector(".history-meta").textContent.toLowerCase();
-                const summary = item.getAttribute("data-summary") || "";
                 
-                if (title.includes(query) || source.includes(query) || summary.includes(query)) {
+                if (title.includes(query) || source.includes(query)) {
                     item.style.display = "block";
                 } else {
                     item.style.display = "none";

@@ -205,3 +205,5 @@ tools/a2a-inspector/
 
 # Local databases
 analyses.db
+
+artifacts/adversarial_test_report.md
