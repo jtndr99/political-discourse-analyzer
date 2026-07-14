@@ -877,6 +877,364 @@
             color: #818cf8;
             box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
         }
+
+        /* ===== RADAR CHART ===== */
+        .radar-chart-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 28px 20px;
+            box-shadow: var(--shadow);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+        .radar-chart-card.visible { display: flex; }
+        .radar-chart-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .radar-chart-title i {
+            font-size: 18px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .radar-svg { width: 380px; height: 380px; max-width: 100%; }
+        .radar-ring { fill: none; stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; }
+        .radar-ring-label { fill: rgba(255, 255, 255, 0.15); font-family: 'Inter', sans-serif; font-size: 8px; }
+        .radar-axis { stroke: rgba(255, 255, 255, 0.08); stroke-width: 1; stroke-dasharray: 4 3; }
+        .radar-data {
+            fill: url(#radarGradient);
+            stroke: rgba(99, 102, 241, 0.7);
+            stroke-width: 2;
+            stroke-linejoin: round;
+            filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.3));
+        }
+        .radar-data-group {
+            transform-origin: 190px 190px;
+            animation: radarGrow 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes radarGrow {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .radar-dot { stroke: var(--bg-color); stroke-width: 2; transition: r 0.3s ease; cursor: pointer; }
+        .radar-dot:hover { r: 8; }
+        .radar-label {
+            fill: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+        .radar-value { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; }
+
+        /* ===== ANIMATED PIPELINE ===== */
+        .pipeline-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            width: 100%;
+        }
+        .pipeline-header { text-align: center; }
+        .pipeline-header h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .pipeline-header p { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+        .pipeline-track {
+            display: flex;
+            align-items: flex-start;
+            overflow-x: auto;
+            padding: 16px 8px;
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+            row-gap: 20px;
+        }
+        .pipeline-track::-webkit-scrollbar { height: 4px; }
+        .pipeline-track::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+        .pipeline-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 64px;
+        }
+        .pipeline-circle {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            border: 2px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .pipeline-label {
+            font-family: 'Outfit', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            transition: color 0.3s ease;
+            max-width: 70px;
+        }
+        .pipeline-line {
+            width: 28px;
+            height: 2px;
+            background: rgba(255,255,255,0.08);
+            margin-top: 22px;
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .pipeline-line::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            height: 100%;
+            width: 0%;
+            background: var(--accent-indigo);
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+        }
+        .pipeline-line.active::after { width: 100%; }
+
+        .pipeline-step.active .pipeline-circle {
+            border-color: var(--accent-indigo);
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent-indigo);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+            animation: pipelinePulse 2s ease-in-out infinite;
+        }
+        .pipeline-step.active .pipeline-circle i { animation: spin 1.5s linear infinite; }
+        .pipeline-step.active .pipeline-label { color: var(--text-primary); }
+
+        .pipeline-step.completed .pipeline-circle {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+            animation: none;
+        }
+        .pipeline-step.completed .pipeline-label { color: var(--accent-green); }
+
+        .pipeline-step.skipped .pipeline-circle {
+            border-color: rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.01);
+            color: rgba(255,255,255,0.15);
+            opacity: 0.4;
+        }
+        .pipeline-step.skipped .pipeline-label { color: rgba(255,255,255,0.25); text-decoration: line-through; }
+
+        .pipeline-step.active[data-framework="pareto"] .pipeline-circle { border-color: var(--accent-cyan); background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
+        .pipeline-step.active[data-framework="sowell"] .pipeline-circle { border-color: var(--accent-purple); background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+        .pipeline-step.active[data-framework="mass_psych"] .pipeline-circle { border-color: var(--accent-pink); background: rgba(236, 72, 153, 0.15); color: var(--accent-pink); box-shadow: 0 0 20px rgba(236, 72, 153, 0.3); }
+        .pipeline-step.active[data-framework="foucault"] .pipeline-circle { border-color: var(--accent-indigo); background: rgba(99, 102, 241, 0.15); color: var(--accent-indigo); box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+
+        @keyframes pipelinePulse {
+            0%, 100% { box-shadow: 0 0 12px rgba(99, 102, 241, 0.2); }
+            50% { box-shadow: 0 0 24px rgba(99, 102, 241, 0.5); }
+        }
+
+        .pipeline-elapsed {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .pipeline-elapsed i { font-size: 16px; }
+
+        /* ===== TOAST NOTIFICATIONS ===== */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 12px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+        .toast {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            background: rgba(31, 41, 55, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px 20px;
+            min-width: 320px;
+            max-width: 420px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+            pointer-events: all;
+            animation: toastSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            position: relative;
+            overflow: hidden;
+        }
+        .toast.dismissing { animation: toastSlideOut 0.3s cubic-bezier(0.4, 0, 1, 1) forwards; }
+        @keyframes toastSlideIn {
+            from { transform: translateX(120%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes toastSlideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(120%); opacity: 0; }
+        }
+        .toast-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+        .toast.success { border-left: 3px solid var(--accent-green); }
+        .toast.success .toast-icon { color: var(--accent-green); }
+        .toast.error { border-left: 3px solid #ef4444; }
+        .toast.error .toast-icon { color: #ef4444; }
+        .toast.info { border-left: 3px solid var(--accent-indigo); }
+        .toast.info .toast-icon { color: var(--accent-indigo); }
+        .toast.warning { border-left: 3px solid #f59e0b; }
+        .toast.warning .toast-icon { color: #f59e0b; }
+        .toast-body { flex: 1; min-width: 0; }
+        .toast-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        .toast-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .toast-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0;
+            flex-shrink: 0;
+            transition: color 0.2s ease;
+        }
+        .toast-close:hover { color: var(--text-primary); }
+        .toast-progress {
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 3px;
+            border-radius: 0 0 14px 14px;
+            animation: toastProgress 4s linear forwards;
+        }
+        .toast.success .toast-progress { background: var(--accent-green); }
+        .toast.error .toast-progress { background: #ef4444; }
+        .toast.info .toast-progress { background: var(--accent-indigo); }
+        .toast.warning .toast-progress { background: #f59e0b; }
+        @keyframes toastProgress {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+
+        /* ===== CONFIRMATION MODAL ===== */
+        .confirm-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: modalFadeIn 0.2s ease;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .confirm-modal {
+            background: rgba(31, 41, 55, 0.98);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 32px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes modalPop {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .confirm-modal h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .confirm-modal h3 i { color: #ef4444; font-size: 22px; }
+        .confirm-modal p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+        .confirm-modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
+        .confirm-modal-btn {
+            border: none;
+            border-radius: 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 10px 24px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .confirm-modal-btn.cancel {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .confirm-modal-btn.cancel:hover { background: rgba(255, 255, 255, 0.12); }
+        .confirm-modal-btn.delete {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+        .confirm-modal-btn.delete:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+        }
     </style>
 </head>
 <body>
@@ -935,19 +1293,60 @@
 
             <!-- Loading steps tracker -->
             <div class="loading-container" id="loadingContainer">
-                <div class="spinner"></div>
-                <div class="steps-tracker">
-                    <div class="step-item active" id="step1">
-                        <div class="step-icon"><i class="bx bx-import"></i></div>
-                        <div class="step-text">Step 1: Reading input & fetching webpage content (InputAgent)...</div>
+                <div class="pipeline-container">
+                    <div class="pipeline-header">
+                        <h3><i class='bx bx-analyse'></i> Analysis Pipeline</h3>
+                        <p>Processing through multi-agent analytical framework</p>
                     </div>
-                    <div class="step-item" id="step2">
-                        <div class="step-icon"><i class="bx bx-git-repo-forked"></i></div>
-                        <div class="step-text">Step 2: Pareto, Sowell, Schmitt, Le Bon, Hoffer, Girard, and Foucault analyzing sequentially...</div>
+                    <div class="pipeline-track">
+                        <div class="pipeline-step" id="pstep-input">
+                            <div class="pipeline-circle"><i class="bx bx-import"></i></div>
+                            <span class="pipeline-label">Input</span>
+                        </div>
+                        <div class="pipeline-line" id="pline-1"></div>
+                        <div class="pipeline-step" id="pstep-security">
+                            <div class="pipeline-circle"><i class="bx bx-shield-alt-2"></i></div>
+                            <span class="pipeline-label">Security</span>
+                        </div>
+                        <div class="pipeline-line" id="pline-2"></div>
+                        <div class="pipeline-step" id="pstep-scope">
+                            <div class="pipeline-circle"><i class="bx bx-filter-alt"></i></div>
+                            <span class="pipeline-label">Scope</span>
+                        </div>
+                        <div class="pipeline-line" id="pline-3"></div>
+                        <div class="pipeline-step" id="pstep-pareto" data-framework="pareto">
+                            <div class="pipeline-circle"><i class="bx bx-grid-alt"></i></div>
+                            <span class="pipeline-label">Pareto</span>
+                        </div>
+                        <div class="pipeline-line" id="pline-4"></div>
+                        <div class="pipeline-step" id="pstep-sowell" data-framework="sowell">
+                            <div class="pipeline-circle"><i class="bx bx-show"></i></div>
+                            <span class="pipeline-label">Sowell</span>
+                        </div>
+                        <div class="pipeline-line" id="pline-5"></div>
+                        <div class="pipeline-step" id="pstep-mass_psych" data-framework="mass_psych">
+                            <div class="pipeline-circle"><i class="bx bx-group"></i></div>
+                            <span class="pipeline-label">Crowd</span>
+                        </div>
+                        <div class="pipeline-line" id="pline-6"></div>
+                        <div class="pipeline-step" id="pstep-foucault" data-framework="foucault">
+                            <div class="pipeline-circle"><i class="bx bx-key"></i></div>
+                            <span class="pipeline-label">Foucault</span>
+                        </div>
+                        <div class="pipeline-line" id="pline-7"></div>
+                        <div class="pipeline-step" id="pstep-grounding">
+                            <div class="pipeline-circle"><i class="bx bx-check-double"></i></div>
+                            <span class="pipeline-label">Grounding</span>
+                        </div>
+                        <div class="pipeline-line" id="pline-8"></div>
+                        <div class="pipeline-step" id="pstep-synthesis">
+                            <div class="pipeline-circle"><i class="bx bx-file"></i></div>
+                            <span class="pipeline-label">Synthesis</span>
+                        </div>
                     </div>
-                    <div class="step-item" id="step3">
-                        <div class="step-icon"><i class="bx bx-file"></i></div>
-                        <div class="step-text">Step 3: Synthesizer compiling report and saving to SQLite DB...</div>
+                    <div class="pipeline-elapsed" id="pipelineElapsed">
+                        <i class="bx bx-time-five"></i>
+                        <span id="elapsedTime">0s elapsed</span>
                     </div>
                 </div>
                 <div class="skeleton-loader">
@@ -970,6 +1369,9 @@
 
             <!-- Analysis Report Viewer -->
             <div class="results-container" id="resultsContainer">
+                <div class="radar-chart-card" id="radarChartContainer">
+                    <div class="radar-chart-title"><i class="bx bx-radar"></i> Cross-Framework Analysis Radar</div>
+                </div>
                 <div class="tabs-header">
                     <button class="tab-btn active" data-tab="final" onclick="switchTab('final')"><i class="bx bx-file"></i> Synthesis Report</button>
                     <button class="tab-btn" data-tab="pareto" onclick="switchTab('pareto')"><i class="bx bx-grid-alt"></i> Pareto Lens</button>
@@ -1109,14 +1511,9 @@
             // Clear active history items
             document.querySelectorAll(".history-item").forEach(el => el.classList.remove("active"));
             
-            // Reset loader step descriptions to original values
-            document.querySelector("#step1 .step-text").innerHTML = "Step 1: Reading input & fetching webpage content (InputAgent)...";
-            document.querySelector("#step2 .step-text").innerHTML = "Step 2: Pareto, Sowell, Schmitt, Le Bon, Hoffer, Girard, and Foucault analyzing sequentially...";
-            document.querySelector("#step3 .step-text").innerHTML = "Step 3: Synthesizer compiling report and saving to SQLite DB...";
-
-            setStepState(1, "active");
-            setStepState(2, "pending");
-            setStepState(3, "pending");
+            // Reset animated pipeline
+            resetPipeline();
+            startElapsedTimer();
 
             try {
                 const res = await fetch("/analyze", {
@@ -1171,43 +1568,68 @@
                             if (parsed) {
                                 if (parsed.event === "start") {
                                     accumulatedData.session_id = parsed.session_id;
-                                    setStepState(1, "active");
+                                    setPipelineState('input', 'active');
+                                } else if (parsed.event === "security_completed") {
+                                    setPipelineState('input', 'completed');
+                                    activatePipelineLine(1);
+                                    setPipelineState('security', 'completed');
+                                    activatePipelineLine(2);
+                                    setPipelineState('scope', 'active');
+                                } else if (parsed.event === "input_classified") {
+                                    setPipelineState('scope', 'completed');
+                                    activatePipelineLine(3);
                                 } else if (parsed.event === "input_processed") {
-                                    setStepState(1, "completed");
-                                    setStepState(2, "active");
-                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Running Pareto Analyst...";
                                     accumulatedData.article_text = parsed.data.text;
+                                    setPipelineState('pareto', 'active');
                                 } else if (parsed.event === "pareto_completed") {
-                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Running Sowell Analyst...";
                                     accumulatedData.pareto_analysis = parsed.data.analysis;
                                     accumulatedData.pareto_metrics = parsed.data.metrics;
+                                    setPipelineState('pareto', 'completed');
+                                    activatePipelineLine(4);
+                                    setPipelineState('sowell', 'active');
                                 } else if (parsed.event === "sowell_completed") {
-                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Running Mass Psychology Analyst...";
                                     accumulatedData.sowell_analysis = parsed.data.analysis;
                                     accumulatedData.sowell_metrics = parsed.data.metrics;
+                                    setPipelineState('sowell', 'completed');
+                                    activatePipelineLine(5);
+                                    setPipelineState('mass_psych', 'active');
                                 } else if (parsed.event === "mass_psych_completed") {
-                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Running Foucault Analyst...";
                                     accumulatedData.mass_psych_analysis = parsed.data.analysis;
                                     accumulatedData.mass_psych_metrics = parsed.data.metrics;
+                                    setPipelineState('mass_psych', 'completed');
+                                    activatePipelineLine(6);
+                                    setPipelineState('foucault', 'active');
                                 } else if (parsed.event === "foucault_completed") {
-                                    setStepState(2, "completed");
-                                    setStepState(3, "active");
-                                    document.querySelector("#step2 .step-text").innerHTML = "Step 2: Framework analysis completed.";
                                     accumulatedData.foucault_analysis = parsed.data.analysis;
                                     accumulatedData.foucault_metrics = parsed.data.metrics;
+                                    setPipelineState('foucault', 'completed');
+                                    activatePipelineLine(7);
+                                    setPipelineState('grounding', 'active');
+                                } else if (parsed.event === "grounding_completed") {
+                                    setPipelineState('grounding', 'completed');
+                                    activatePipelineLine(8);
+                                    setPipelineState('synthesis', 'active');
                                 } else if (parsed.event === "synthesis_completed") {
-                                    setStepState(3, "completed");
+                                    // Handle skip_analysts path
+                                    if (!accumulatedData.pareto_analysis) {
+                                        ['pareto', 'sowell', 'mass_psych', 'foucault', 'grounding'].forEach(id => {
+                                            setPipelineState(id, 'skipped');
+                                        });
+                                        for (let i = 3; i <= 8; i++) activatePipelineLine(i);
+                                    }
+                                    setPipelineState('synthesis', 'completed');
                                     accumulatedData.final_report = parsed.data.report_md;
                                     accumulatedData.title = parsed.data.title;
                                     accumulatedData.summary = parsed.data.summary;
                                 } else if (parsed.event === "complete") {
                                     isComplete = true;
-                                    // Done! Display the report
+                                    stopElapsedTimer();
                                     setTimeout(() => {
                                         loadingContainer.style.display = "none";
                                         document.getElementById("analyzeBtn").disabled = false;
                                         displayReport(accumulatedData);
-                                        loadHistory(); // Reload history sidebar
+                                        loadHistory();
+                                        showToast('success', 'Analysis Complete', 'Report generated and saved to database.');
                                     }, 1000);
                                 } else if (parsed.event === "error") {
                                     throw new Error(parsed.message);
@@ -1221,28 +1643,225 @@
                     throw new Error("Stream closed prematurely by server.");
                 }
             } catch (e) {
-                alert("Analysis failed: " + e.message);
+                stopElapsedTimer();
+                showToast('error', 'Analysis Failed', e.message);
                 loadingContainer.style.display = "none";
                 document.getElementById("analyzeBtn").disabled = false;
                 document.getElementById("welcomeScreen").style.display = "flex";
             }
         }
 
-        function setStepState(stepNum, state) {
-            const stepEl = document.getElementById(`step${stepNum}`);
-            stepEl.className = "step-item " + state;
-            const iconEl = stepEl.querySelector(".step-icon i");
-            
-            if (state === "completed") {
-                iconEl.className = "bx bx-check-circle";
-            } else if (state === "active") {
-                iconEl.className = "bx bx-loader-alt bx-spin";
-            } else {
-                if (stepNum === 1) iconEl.className = "bx bx-import";
-                if (stepNum === 2) iconEl.className = "bx bx-git-repo-forked";
-                if (stepNum === 3) iconEl.className = "bx bx-file";
+        // ===== TOAST NOTIFICATION SYSTEM =====
+        function showToast(type, title, message) {
+            const container = document.getElementById('toastContainer');
+            const icons = { success: 'bx-check-circle', error: 'bx-error-circle', info: 'bx-info-circle', warning: 'bx-error' };
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <i class="bx ${icons[type] || icons.info} toast-icon"></i>
+                <div class="toast-body">
+                    <div class="toast-title">${title}</div>
+                    ${message ? `<div class="toast-message">${message}</div>` : ''}
+                </div>
+                <button class="toast-close" onclick="dismissToast(this.parentElement)"><i class="bx bx-x"></i></button>
+                <div class="toast-progress"></div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => dismissToast(toast), 4000);
+        }
+
+        function dismissToast(toast) {
+            if (!toast || toast.classList.contains('dismissing')) return;
+            toast.classList.add('dismissing');
+            setTimeout(() => toast.remove(), 300);
+        }
+
+        // ===== CONFIRMATION MODAL =====
+        let confirmModalCallback = null;
+
+        function showConfirmModal(title, message, onConfirm) {
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalMessage').textContent = message;
+            confirmModalCallback = onConfirm;
+            document.getElementById('confirmModal').style.display = 'flex';
+            document.getElementById('confirmModalAction').onclick = () => {
+                closeConfirmModal();
+                if (confirmModalCallback) confirmModalCallback();
+            };
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+            confirmModalCallback = null;
+        }
+
+        // Close modal on overlay click or Escape
+        document.getElementById('confirmModal')?.addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeConfirmModal();
+        });
+
+        // ===== ANIMATED PIPELINE =====
+        let pipelineTimer = null;
+        let pipelineStartTime = null;
+        const pipelineIconMap = {
+            'input': 'bx-import', 'security': 'bx-shield-alt-2', 'scope': 'bx-filter-alt',
+            'pareto': 'bx-grid-alt', 'sowell': 'bx-show', 'mass_psych': 'bx-group',
+            'foucault': 'bx-key', 'grounding': 'bx-check-double', 'synthesis': 'bx-file'
+        };
+
+        function resetPipeline() {
+            document.querySelectorAll('.pipeline-step').forEach(s => s.className = 'pipeline-step' + (s.dataset.framework ? '' : ''));
+            // Re-apply data-framework attribute classes
+            document.querySelectorAll('.pipeline-step[data-framework]').forEach(s => s.className = 'pipeline-step');
+            document.querySelectorAll('.pipeline-line').forEach(l => l.classList.remove('active'));
+            Object.entries(pipelineIconMap).forEach(([id, icon]) => {
+                const el = document.getElementById('pstep-' + id);
+                if (el) el.querySelector('.pipeline-circle i').className = 'bx ' + icon;
+            });
+            document.getElementById('elapsedTime').textContent = '0s elapsed';
+        }
+
+        function setPipelineState(nodeId, state) {
+            const step = document.getElementById('pstep-' + nodeId);
+            if (!step) return;
+            step.classList.remove('active', 'completed', 'skipped');
+            step.classList.add(state);
+            const iconEl = step.querySelector('.pipeline-circle i');
+            if (state === 'completed') {
+                iconEl.className = 'bx bx-check';
+            } else if (state !== 'active') {
+                // Restore original icon for non-active, non-completed states
+                iconEl.className = 'bx ' + (pipelineIconMap[nodeId] || 'bx-circle');
             }
         }
+
+        function activatePipelineLine(num) {
+            const line = document.getElementById('pline-' + num);
+            if (line) line.classList.add('active');
+        }
+
+        function startElapsedTimer() {
+            pipelineStartTime = Date.now();
+            const el = document.getElementById('elapsedTime');
+            pipelineTimer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - pipelineStartTime) / 1000);
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                el.textContent = mins > 0 ? `${mins}m ${secs}s elapsed` : `${secs}s elapsed`;
+            }, 1000);
+        }
+
+        function stopElapsedTimer() {
+            if (pipelineTimer) { clearInterval(pipelineTimer); pipelineTimer = null; }
+        }
+
+        // ===== RADAR CHART =====
+        function renderRadarChart(data) {
+            const container = document.getElementById('radarChartContainer');
+            if (!container) return;
+
+            const metrics = { foxDrive: 50, unconstrained: 50, schmitt: 15, mimetic: 20, scapegoat: 15 };
+
+            if (data.pareto_metrics && typeof data.pareto_metrics.fox_drive_score !== 'undefined')
+                metrics.foxDrive = data.pareto_metrics.fox_drive_score;
+            if (data.sowell_metrics && typeof data.sowell_metrics.unconstrained_score !== 'undefined') {
+                metrics.unconstrained = data.sowell_metrics.unconstrained_score;
+                metrics.schmitt = data.sowell_metrics.schmitt_intensity;
+            }
+            if (data.mass_psych_metrics && typeof data.mass_psych_metrics.mimetic_tension !== 'undefined') {
+                metrics.mimetic = data.mass_psych_metrics.mimetic_tension;
+                metrics.scapegoat = data.mass_psych_metrics.scapegoat_index;
+            }
+
+            const hasMetrics = (data.pareto_metrics && Object.keys(data.pareto_metrics).length > 0) ||
+                              (data.sowell_metrics && Object.keys(data.sowell_metrics).length > 0) ||
+                              (data.mass_psych_metrics && Object.keys(data.mass_psych_metrics).length > 0);
+
+            if (!hasMetrics) { container.classList.remove('visible'); return; }
+
+            const axes = [
+                { label: 'Fox Drive', value: metrics.foxDrive, color: '#06b6d4' },
+                { label: 'Unconstrained', value: metrics.unconstrained, color: '#a855f7' },
+                { label: 'Schmitt', value: metrics.schmitt, color: '#c084fc' },
+                { label: 'Mimetic', value: metrics.mimetic, color: '#ec4899' },
+                { label: 'Scapegoat', value: metrics.scapegoat, color: '#f472b6' }
+            ];
+
+            const cx = 190, cy = 190, radius = 130, n = axes.length;
+            const angleStep = (2 * Math.PI) / n;
+            const startAngle = -Math.PI / 2;
+
+            let svg = `<svg viewBox="0 0 380 380" class="radar-svg">`;
+            svg += `<defs><radialGradient id="radarGradient" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(99, 102, 241, 0.3)" />
+                <stop offset="100%" stop-color="rgba(168, 85, 247, 0.08)" />
+            </radialGradient></defs>`;
+
+            // Grid rings
+            for (let ring = 1; ring <= 5; ring++) {
+                const r = (ring / 5) * radius;
+                let pts = [];
+                for (let i = 0; i < n; i++) {
+                    const a = startAngle + i * angleStep;
+                    pts.push(`${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`);
+                }
+                svg += `<polygon points="${pts.join(' ')}" class="radar-ring" />`;
+                if (ring % 2 === 0) svg += `<text x="${cx + 4}" y="${cy - r + 4}" class="radar-ring-label">${ring * 20}</text>`;
+            }
+
+            // Axis lines
+            for (let i = 0; i < n; i++) {
+                const a = startAngle + i * angleStep;
+                svg += `<line x1="${cx}" y1="${cy}" x2="${cx + radius * Math.cos(a)}" y2="${cy + radius * Math.sin(a)}" class="radar-axis" />`;
+            }
+
+            // Data polygon + dots
+            svg += `<g class="radar-data-group">`;
+            let dataPts = [];
+            for (let i = 0; i < n; i++) {
+                const a = startAngle + i * angleStep;
+                const r = (axes[i].value / 100) * radius;
+                dataPts.push(`${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`);
+            }
+            svg += `<polygon points="${dataPts.join(' ')}" class="radar-data" />`;
+            for (let i = 0; i < n; i++) {
+                const a = startAngle + i * angleStep;
+                const r = (axes[i].value / 100) * radius;
+                svg += `<circle cx="${cx + r * Math.cos(a)}" cy="${cy + r * Math.sin(a)}" r="5" class="radar-dot" fill="${axes[i].color}" />`;
+            }
+            svg += `</g>`;
+
+            // Labels + values
+            for (let i = 0; i < n; i++) {
+                const a = startAngle + i * angleStep;
+                const lr = radius + 30;
+                const x = cx + lr * Math.cos(a), y = cy + lr * Math.sin(a);
+                let anchor = 'middle';
+                if (Math.cos(a) > 0.3) anchor = 'start';
+                if (Math.cos(a) < -0.3) anchor = 'end';
+                svg += `<text x="${x}" y="${y - 6}" class="radar-label" text-anchor="${anchor}" dominant-baseline="middle">${axes[i].label}</text>`;
+                svg += `<text x="${x}" y="${y + 10}" class="radar-value" text-anchor="${anchor}" dominant-baseline="middle" fill="${axes[i].color}">${axes[i].value}</text>`;
+            }
+
+            svg += `</svg>`;
+            container.innerHTML = '<div class="radar-chart-title"><i class="bx bx-radar"></i> Cross-Framework Analysis Radar</div>' + svg;
+            container.classList.add('visible');
+        }
+
+        // ===== KEYBOARD SHORTCUTS =====
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                const btn = document.getElementById('analyzeBtn');
+                if (btn && !btn.disabled) startAnalysis();
+            }
+            if (e.key === 'Escape' && document.getElementById('confirmModal').style.display !== 'flex') {
+                resetDashboard();
+            }
+            if (e.key === '/' && !['TEXTAREA', 'INPUT'].includes(document.activeElement.tagName)) {
+                e.preventDefault();
+                document.getElementById('searchHistory')?.focus();
+            }
+        });
 
         function buildOriginalTextHtml(originalText) {
             if (!originalText) return "";
@@ -1270,6 +1889,7 @@
             document.getElementById("tabMarkdown-foucault").innerHTML = marked.parse(data.foucault_analysis);
             
             updateVisualizers(data);
+            renderRadarChart(data);
             switchTab('final');
         }
 
@@ -1301,9 +1921,10 @@
                 document.getElementById("tabMarkdown-foucault").innerHTML = report.foucault_analysis ? marked.parse(report.foucault_analysis) : "<p>No Foucault analysis saved for this report.</p>";
                 
                 updateVisualizers(report);
+                renderRadarChart(report);
                 switchTab('final');
             } catch (e) {
-                alert("Failed to load saved report: " + e.message);
+                showToast('error', 'Load Failed', e.message);
             }
         }
 
@@ -1350,13 +1971,14 @@
                 const btn = document.getElementById("copyReportBtn");
                 btn.classList.add("copied");
                 btn.innerHTML = '<i class="bx bx-check"></i>';
+                showToast('success', 'Copied!', 'Report markdown copied to clipboard.');
                 setTimeout(() => {
                     btn.classList.remove("copied");
                     btn.innerHTML = '<i class="bx bx-copy"></i>';
                 }, 2000);
             } catch (err) {
                 console.error("Failed to copy text: ", err);
-                alert("Failed to copy report to clipboard.");
+                showToast('error', 'Copy Failed', 'Could not copy report to clipboard.');
             }
         }
 
@@ -1368,23 +1990,20 @@
         // Delete Report
         async function deleteHistory(event, id) {
             event.stopPropagation();
-            if (!confirm("Are you sure you want to delete this analysis report?")) return;
-            try {
-                const res = await fetch(`/history/${id}`, {
-                    method: "DELETE"
-                });
-                if (!res.ok) throw new Error("Failed to delete report from database");
-                
-                // If the deleted report is active, reset dashboard
-                const activeItem = document.getElementById(`history-item-${id}`);
-                if (activeItem && activeItem.classList.contains("active")) {
-                    resetDashboard();
+            showConfirmModal('Delete Analysis', 'Are you sure you want to delete this analysis report? This action cannot be undone.', async () => {
+                try {
+                    const res = await fetch(`/history/${id}`, { method: "DELETE" });
+                    if (!res.ok) throw new Error("Failed to delete report from database");
+                    const activeItem = document.getElementById(`history-item-${id}`);
+                    if (activeItem && activeItem.classList.contains("active")) {
+                        resetDashboard();
+                    }
+                    loadHistory();
+                    showToast('success', 'Report Deleted', 'Analysis report has been removed.');
+                } catch (e) {
+                    showToast('error', 'Delete Failed', e.message);
                 }
-                
-                loadHistory();
-            } catch (e) {
-                alert("Error deleting report: " + e.message);
-            }
+            });
         }
 
         // Export Report as Markdown
@@ -1769,5 +2388,20 @@
             `;
         }
     </script>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="confirm-modal-overlay" style="display: none;">
+        <div class="confirm-modal">
+            <h3><i class="bx bx-error-circle"></i> <span id="confirmModalTitle">Confirm</span></h3>
+            <p id="confirmModalMessage">Are you sure?</p>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn cancel" onclick="closeConfirmModal()">Cancel</button>
+                <button class="confirm-modal-btn delete" id="confirmModalAction">Delete</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
