@@ -32,6 +32,43 @@
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        :root.light-mode {
+            --bg-color: #f3f4f6;
+            --sidebar-bg: rgba(255, 255, 255, 0.85);
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --border-color: rgba(0, 0, 0, 0.1);
+            --text-primary: #1f2937;
+            --text-secondary: #4b5563;
+            --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        :root.light-mode .sidebar-header h1 {
+            background: linear-gradient(135deg, #1f2937 0%, #4b5563 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        :root.light-mode textarea {
+            background: rgba(255, 255, 255, 0.6);
+            color: var(--text-primary);
+        }
+
+        :root.light-mode textarea:focus {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        :root.light-mode .visualizer-card-mini {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        :root.light-mode .gauge-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        :root.light-mode .gauge-value-display {
+            color: var(--text-primary);
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -180,6 +217,31 @@
             font-family: 'Outfit', sans-serif;
             font-size: 24px;
             font-weight: 700;
+        }
+
+        .theme-toggle-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+            transition: var(--transition);
+        }
+        .theme-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.05);
+        }
+        :root.light-mode .theme-toggle-btn {
+            background: rgba(0, 0, 0, 0.03);
+        }
+        :root.light-mode .theme-toggle-btn:hover {
+            background: rgba(0, 0, 0, 0.08);
         }
 
         .header-info p {
@@ -440,7 +502,7 @@
             margin-top: 24px;
             margin-bottom: 16px;
             font-weight: 700;
-            color: white;
+            color: var(--text-primary);
         }
 
         .markdown-body h1 { font-size: 22px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
@@ -449,7 +511,8 @@
 
         .markdown-body p {
             margin-bottom: 16px;
-            color: rgba(243, 244, 246, 0.9);
+            color: var(--text-primary);
+            opacity: 0.95;
         }
 
         .markdown-body ul, .markdown-body ol {
@@ -464,7 +527,7 @@
         .markdown-body blockquote {
             border-left: 4px solid var(--accent-indigo);
             padding: 8px 20px;
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(128, 128, 128, 0.1);
             border-radius: 0 8px 8px 0;
             margin-bottom: 16px;
             font-style: italic;
@@ -472,7 +535,7 @@
         }
 
         .markdown-body code {
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(128, 128, 128, 0.15);
             padding: 3px 6px;
             border-radius: 4px;
             font-family: monospace;
@@ -1235,6 +1298,66 @@
             transform: translateY(-1px);
             box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
         }
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                transform: translateX(-100%);
+                width: 280px;
+            }
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            .sidebar-backdrop {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 5;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            .sidebar-backdrop.show {
+                display: block;
+                opacity: 1;
+            }
+            .header {
+                padding: 16px 20px;
+            }
+            .header-info h2 {
+                font-size: 18px;
+            }
+            .header-info p {
+                display: none; /* Hide subtitle on very small screens to save space */
+            }
+            .content-area {
+                padding: 16px;
+            }
+            .input-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .pipeline-container {
+                overflow-x: auto;
+                padding-bottom: 8px;
+            }
+            .pipeline-track {
+                min-width: 600px; /* Force horizontal scroll */
+            }
+            .tabs-header {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding-bottom: 8px;
+                -webkit-overflow-scrolling: touch;
+            }
+            .tabs-header::-webkit-scrollbar {
+                height: 4px;
+            }
+            .radar-chart-container {
+                transform: scale(0.85); /* Slightly scale down radar chart on mobile */
+            }
+        }
     </style>
 </head>
 <body>
@@ -1256,6 +1379,8 @@
         </div>
     </div>
 
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
     <!-- Main Panel -->
     <div class="main-panel">
         <div class="header">
@@ -1269,7 +1394,9 @@
                 </div>
             </div>
             <div>
-                <!-- Extra top actions if needed -->
+                <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Theme">
+                    <i class="bx bx-moon" id="themeIcon"></i>
+                </button>
             </div>
         </div>
 
@@ -1435,6 +1562,25 @@
     </div>
 
     <script>
+        // Initialize Theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            document.documentElement.classList.add('light-mode');
+        }
+        document.addEventListener("DOMContentLoaded", () => {
+            const isLight = document.documentElement.classList.contains('light-mode');
+            const themeIcon = document.getElementById('themeIcon');
+            if(themeIcon) themeIcon.className = isLight ? 'bx bx-sun' : 'bx bx-moon';
+        });
+
+        function toggleTheme() {
+            const root = document.documentElement;
+            root.classList.toggle('light-mode');
+            const isLight = root.classList.contains('light-mode');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+            const themeIcon = document.getElementById('themeIcon');
+            if(themeIcon) themeIcon.className = isLight ? 'bx bx-sun' : 'bx bx-moon';
+        }
         let currentMarkdownReport = "";
 
         // Load initial history on page load
@@ -1982,9 +2128,14 @@
             }
         }
 
-        // Toggle Sidebar collapsed state
+        // Toggle Sidebar collapsed state (or mobile open state)
         function toggleSidebar() {
-            document.body.classList.toggle("sidebar-collapsed");
+            if (window.innerWidth <= 768) {
+                document.querySelector('.sidebar').classList.toggle('mobile-open');
+                document.getElementById('sidebarBackdrop').classList.toggle('show');
+            } else {
+                document.body.classList.toggle("sidebar-collapsed");
+            }
         }
 
         // Delete Report
