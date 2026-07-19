@@ -1,50 +1,21 @@
 import asyncio
 import json
 import os
-import sqlite3
+import uuid
+import datetime
+import boto3
 
 import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-# Initialize SQLite database
-DB_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "analyses.db"
-)
+# DynamoDB Configuration
+DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "analyses")
+dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+analyses_table = dynamodb.Table(DYNAMODB_TABLE_NAME)
 
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS analyses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            source TEXT NOT NULL,
-            report_md TEXT NOT NULL,
-            summary TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # Check and add new columns if they do not exist (migration logic)
-    cursor.execute("PRAGMA table_info(analyses)")
-    columns = [col[1] for col in cursor.fetchall()]
-
-    new_cols = {
-        "original_text": "TEXT",
-        "pareto_analysis": "TEXT",
-        "sowell_analysis": "TEXT",
-        "mass_psych_analysis": "TEXT",
-        "foucault_analysis": "TEXT",
-    }
-
-    for col_name, col_type in new_cols.items():
-        if col_name not in columns:
-            cursor.execute(f"ALTER TABLE analyses ADD COLUMN {col_name} {col_type}")
-
-    conn.commit()
-    conn.close()
+# DynamoDB does not require explicit schema initialization for new columns.
 
 
 # Framework reference library grounding text
@@ -166,7 +137,7 @@ async def handle_list_tools() -> list[types.Tool]:
                 "type": "object",
                 "properties": {
                     "report_id": {
-                        "type": "integer",
+                        "type": "string",
                         "description": "The ID of the saved report.",
                     }
                 },
@@ -205,25 +176,24 @@ async def handle_call_tool(
         foucault_analysis = arguments.get("foucault_analysis", "")
 
         try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO analyses (title, source, report_md, summary, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    title,
-                    source,
-                    report_md,
-                    summary,
-                    original_text,
-                    pareto_analysis,
-                    sowell_analysis,
-                    mass_psych_analysis,
-                    foucault_analysis,
-                ),
-            )
-            report_id = cursor.lastrowid
-            conn.commit()
-            conn.close()
+            report_id = str(uuid.uuid4())
+            created_at = datetime.datetime.utcnow().isoformat()
+            
+            item = {
+                "id": report_id,
+                "created_at": created_at,
+                "title": title,
+                "source": source,
+                "report_md": report_md,
+                "summary": summary,
+                "original_text": original_text,
+                "pareto_analysis": pareto_analysis,
+                "sowell_analysis": sowell_analysis,
+                "mass_psych_analysis": mass_psych_analysis,
+                "foucault_analysis": foucault_analysis,
+            }
+            analyses_table.put_item(Item=item)
+
             return [
                 types.TextContent(
                     type="text",
@@ -239,27 +209,13 @@ async def handle_call_tool(
 
     elif name == "list_analysis_reports":
         try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, title, source, summary, created_at FROM analyses ORDER BY id DESC"
+            response = analyses_table.scan(
+                ProjectionExpression="id, title, #src, summary, created_at",
+                ExpressionAttributeNames={"#src": "source"}
             )
-            rows = cursor.fetchall()
-            conn.close()
-
-            reports = []
-            for row in rows:
-                reports.append(
-                    {
-                        "id": row[0],
-                        "title": row[1],
-                        "source": row[2],
-                        "summary": row[3],
-                        "created_at": row[4],
-                    }
-                )
-
-            return [types.TextContent(type="text", text=json.dumps(reports, indent=2))]
+            items = response.get('Items', [])
+            items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            return [types.TextContent(type="text", text=json.dumps(items, indent=2))]
         except Exception as e:
             return [
                 types.TextContent(type="text", text=f"Error listing reports: {e!s}")
@@ -268,16 +224,10 @@ async def handle_call_tool(
     elif name == "get_analysis_report":
         report_id = arguments.get("report_id")
         try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, title, source, report_md, summary, created_at, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis FROM analyses WHERE id = ?",
-                (report_id,),
-            )
-            row = cursor.fetchone()
-            conn.close()
+            response = analyses_table.get_item(Key={"id": report_id})
+            item = response.get('Item')
 
-            if not row:
+            if not item:
                 return [
                     types.TextContent(
                         type="text",
@@ -285,20 +235,7 @@ async def handle_call_tool(
                     )
                 ]
 
-            report = {
-                "id": row[0],
-                "title": row[1],
-                "source": row[2],
-                "report_md": row[3],
-                "summary": row[4],
-                "created_at": row[5],
-                "original_text": row[6],
-                "pareto_analysis": row[7],
-                "sowell_analysis": row[8],
-                "mass_psych_analysis": row[9],
-                "foucault_analysis": row[10],
-            }
-            return [types.TextContent(type="text", text=json.dumps(report, indent=2))]
+            return [types.TextContent(type="text", text=json.dumps(item, indent=2))]
         except Exception as e:
             return [
                 types.TextContent(type="text", text=f"Error retrieving report: {e!s}")
@@ -308,9 +245,6 @@ async def handle_call_tool(
 
 
 async def main():
-    # Initialize DB schema
-    init_db()
-
     # Run the server using stdio transport
     async with stdio_server() as (read_stream, write_stream):
         await server.run(

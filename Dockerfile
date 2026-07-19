@@ -12,17 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM python:3.12-slim
+FROM public.ecr.aws/lambda/python:3.12
 
 RUN pip install --no-cache-dir uv==0.8.13
 
-WORKDIR /code
+COPY ./pyproject.toml ./README.md ./uv.lock* ${LAMBDA_TASK_ROOT}/
+COPY ./app ${LAMBDA_TASK_ROOT}/app
 
-COPY ./pyproject.toml ./README.md ./uv.lock* ./
-
-COPY ./app ./app
-
-RUN uv sync --frozen
+RUN uv pip install --system -r pyproject.toml
 
 ARG COMMIT_SHA=""
 ENV COMMIT_SHA=${COMMIT_SHA}
@@ -30,6 +27,5 @@ ENV COMMIT_SHA=${COMMIT_SHA}
 ARG AGENT_VERSION=0.0.0
 ENV AGENT_VERSION=${AGENT_VERSION}
 
-EXPOSE 8080
-
-CMD ["uv", "run", "uvicorn", "app.fast_api_app:app", "--host", "0.0.0.0", "--port", "8080"]
+# Set the CMD to your handler
+CMD ["app.lambda_handler.handler"]

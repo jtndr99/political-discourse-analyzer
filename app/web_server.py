@@ -1,9 +1,9 @@
 import logging
 import os
 import re
-import sqlite3
 import sys
 import uuid
+import boto3
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -26,10 +26,10 @@ logger = logging.getLogger("discourse_anal_web")
 
 app = FastAPI(title="Political Discourse Analyzer Dashboard")
 
-# SQLite DB Path (Shared with MCP Server)
-DB_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "analyses.db"
-)
+# DynamoDB Configuration
+DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "analyses")
+dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+analyses_table = dynamodb.Table(DYNAMODB_TABLE_NAME)
 
 # Jinja2 Templates setup
 TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
@@ -405,32 +405,29 @@ async def analyze_discourse(payload: AnalysisRequest):
                             if len(summary) > 200:
                                 summary = summary[:197] + "..."
 
-            db_id = None
+            db_id = str(uuid.uuid4())
             try:
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO analyses (title, source, report_md, summary, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        title,
-                        input_text,
-                        report_md,
-                        summary,
-                        original_text,
-                        get_db_value(pareto_raw),
-                        get_db_value(sowell_raw),
-                        get_db_value(mass_psych_raw),
-                        get_db_value(foucault_raw),
-                    ),
-                )
-                db_id = cursor.lastrowid
-                conn.commit()
-                conn.close()
+                import datetime
+                created_at = datetime.datetime.utcnow().isoformat()
+                item = {
+                    "id": db_id,
+                    "created_at": created_at,
+                    "title": title,
+                    "source": input_text,
+                    "report_md": report_md,
+                    "summary": summary,
+                    "original_text": original_text,
+                    "pareto_analysis": get_db_value(pareto_raw),
+                    "sowell_analysis": get_db_value(sowell_raw),
+                    "mass_psych_analysis": get_db_value(mass_psych_raw),
+                    "foucault_analysis": get_db_value(foucault_raw),
+                }
+                analyses_table.put_item(Item=item)
                 logger.info(
-                    f"Successfully saved analysis report {db_id} to SQLite database programmatically."
+                    f"Successfully saved analysis report {db_id} to DynamoDB."
                 )
             except Exception as e:
-                logger.error(f"Failed to save analysis report to database: {e}")
+                logger.error(f"Failed to save analysis report to DynamoDB: {e}")
 
             # Yield complete event with database row ID
             yield f"data: {json.dumps({'event': 'complete', 'session_id': session_id, 'db_id': db_id})}\n\n"
@@ -445,49 +442,30 @@ async def analyze_discourse(payload: AnalysisRequest):
 @app.get("/history")
 async def get_history():
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, title, source, summary, created_at FROM analyses ORDER BY id DESC"
+        response = analyses_table.scan(
+            ProjectionExpression="id, title, #src, summary, created_at",
+            ExpressionAttributeNames={"#src": "source"}
         )
-        rows = cursor.fetchall()
-        conn.close()
-
-        reports = []
-        for row in rows:
-            reports.append(
-                {
-                    "id": row[0],
-                    "title": row[1],
-                    "source": row[2],
-                    "summary": row[3],
-                    "created_at": row[4],
-                }
-            )
-        return JSONResponse(content=reports)
+        items = response.get('Items', [])
+        items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        return JSONResponse(content=items)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 @app.get("/history/{report_id}")
-async def get_report(report_id: int):
+async def get_report(report_id: str):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, title, source, report_md, summary, created_at, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis FROM analyses WHERE id = ?",
-            (report_id,),
-        )
-        row = cursor.fetchone()
-        conn.close()
+        response = analyses_table.get_item(Key={"id": report_id})
+        item = response.get('Item')
 
-        if not row:
+        if not item:
             raise HTTPException(status_code=404, detail="Report not found")
 
-        pareto_db = row[7] or ""
-        sowell_db = row[8] or ""
-        mass_psych_db = row[9] or ""
-        foucault_db = row[10] or ""
+        pareto_db = item.get("pareto_analysis", "")
+        sowell_db = item.get("sowell_analysis", "")
+        mass_psych_db = item.get("mass_psych_analysis", "")
+        foucault_db = item.get("foucault_analysis", "")
 
         pareto_md, pareto_metrics = parse_analyst_output(pareto_db)
         sowell_md, sowell_metrics = parse_analyst_output(sowell_db)
@@ -495,13 +473,13 @@ async def get_report(report_id: int):
         foucault_md, foucault_metrics = parse_analyst_output(foucault_db)
 
         report = {
-            "id": row[0],
-            "title": row[1],
-            "source": row[2],
-            "report_md": row[3],
-            "summary": row[4],
-            "created_at": row[5],
-            "original_text": row[6] or "",
+            "id": item.get("id"),
+            "title": item.get("title"),
+            "source": item.get("source"),
+            "report_md": item.get("report_md"),
+            "summary": item.get("summary"),
+            "created_at": item.get("created_at"),
+            "original_text": item.get("original_text", ""),
             "pareto_analysis": pareto_md,
             "sowell_analysis": sowell_md,
             "mass_psych_analysis": mass_psych_md,
@@ -517,13 +495,9 @@ async def get_report(report_id: int):
 
 
 @app.delete("/history/{report_id}")
-async def delete_report(report_id: int):
+async def delete_report(report_id: str):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM analyses WHERE id = ?", (report_id,))
-        conn.commit()
-        conn.close()
+        analyses_table.delete_item(Key={"id": report_id})
         return JSONResponse(
             content={"status": "success", "message": f"Report {report_id} deleted."}
         )
@@ -532,10 +506,5 @@ async def delete_report(report_id: int):
 
 
 if __name__ == "__main__":
-    # Ensure analyses.db is initialized before starting
-    from app.mcp_server import init_db
-
-    init_db()
-
     # Run the web server
     uvicorn.run("app.web_server:app", host="127.0.0.1", port=8000, reload=True)
