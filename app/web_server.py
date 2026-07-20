@@ -117,7 +117,7 @@ async def get_dashboard(request: Request):
     
     expected_token = get_session_token(admin_pass) if admin_pass else ""
     if not admin_pass or not auth_cookie or not secrets.compare_digest(auth_cookie, expected_token):
-        return templates.TemplateResponse("login.html", {"request": request})
+        return templates.TemplateResponse(request=request, name="login.html", context={"request": request})
         
     return templates.TemplateResponse(
         request=request, name="dashboard.html", context={"request": request}
@@ -133,7 +133,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
         session_token = get_session_token(admin_pass)
         response.set_cookie(key="session_auth", value=session_token, httponly=True, max_age=86400*30)
         return response
-    return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
+    return templates.TemplateResponse(request=request, name="login.html", context={"request": request, "error": "Invalid credentials"})
 
 
 @app.post("/analyze", dependencies=[Depends(check_auth)])
