@@ -8,6 +8,7 @@ import boto3
 import uvicorn
 import secrets
 import hashlib
+import time
 from fastapi import FastAPI, HTTPException, Request, Depends, status, Form
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -26,24 +27,36 @@ from app.agent import root_agent
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("discourse_anal_web")
 
-def get_session_token(admin_pass: str) -> str:
-    return hashlib.sha256(f"discourse_salt_{admin_pass}".encode()).hexdigest()
+def create_session() -> str:
+    token = secrets.token_urlsafe(32)
+    sessions_table.put_item(Item={
+        "token": token,
+        "created_at": int(time.time()),
+        "expires_at": int(time.time()) + 86400 * 30,
+    })
+    return token
 
 def check_auth(request: Request):
     auth_cookie = request.cookies.get("session_auth")
-    admin_pass = os.environ.get("ADMIN_PASSWORD")
-    if not admin_pass or not auth_cookie:
+    if not auth_cookie:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    expected_token = get_session_token(admin_pass)
-    if not secrets.compare_digest(auth_cookie, expected_token):
+    try:
+        item = sessions_table.get_item(Key={"token": auth_cookie}).get("Item")
+    except Exception as e:
+        logger.error(f"Error checking session in DynamoDB: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+        
+    if not item:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 app = FastAPI(title="Political Discourse Analyzer Dashboard")
 
 # DynamoDB Configuration
 DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "analyses")
+DYNAMODB_SESSIONS_TABLE_NAME = os.environ.get("DYNAMODB_SESSIONS_TABLE_NAME", "discourse-sessions")
 dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 analyses_table = dynamodb.Table(DYNAMODB_TABLE_NAME)
+sessions_table = dynamodb.Table(DYNAMODB_SESSIONS_TABLE_NAME)
 
 # Jinja2 Templates setup
 TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
@@ -113,10 +126,16 @@ def get_db_value(raw_val):
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard(request: Request):
     auth_cookie = request.cookies.get("session_auth")
-    admin_pass = os.environ.get("ADMIN_PASSWORD")
-    
-    expected_token = get_session_token(admin_pass) if admin_pass else ""
-    if not admin_pass or not auth_cookie or not secrets.compare_digest(auth_cookie, expected_token):
+    is_authenticated = False
+    if auth_cookie:
+        try:
+            item = sessions_table.get_item(Key={"token": auth_cookie}).get("Item")
+            if item:
+                is_authenticated = True
+        except Exception as e:
+            logger.error(f"Error checking session on dashboard: {e}")
+            
+    if not is_authenticated:
         return templates.TemplateResponse(request=request, name="login.html", context={"request": request})
         
     return templates.TemplateResponse(
@@ -130,7 +149,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
     
     if admin_user and admin_pass and secrets.compare_digest(username, admin_user) and secrets.compare_digest(password, admin_pass):
         response = RedirectResponse(url="/", status_code=303)
-        session_token = get_session_token(admin_pass)
+        session_token = create_session()
         response.set_cookie(key="session_auth", value=session_token, httponly=True, max_age=86400*30)
         return response
     return templates.TemplateResponse(request=request, name="login.html", context={"request": request, "error": "Invalid credentials"})
