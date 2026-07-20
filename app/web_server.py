@@ -7,9 +7,8 @@ import boto3
 
 import uvicorn
 import secrets
-from fastapi import FastAPI, HTTPException, Request, Depends, status
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import FastAPI, HTTPException, Request, Depends, status, Form
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -26,38 +25,13 @@ from app.agent import root_agent
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("discourse_anal_web")
 
-security = HTTPBasic(auto_error=False)
-
-def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
-            headers={"WWW-Authenticate": 'Basic realm="Political Discourse Analyzer"'},
-        )
-        
-    admin_user = os.environ.get("ADMIN_USERNAME")
+def check_auth(request: Request):
+    auth_cookie = request.cookies.get("session_auth")
     admin_pass = os.environ.get("ADMIN_PASSWORD")
-    
-    if not admin_user or not admin_pass:
-        logger.error("ADMIN_USERNAME or ADMIN_PASSWORD not set in environment.")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication not configured on server",
-        )
+    if not admin_pass or not auth_cookie or not secrets.compare_digest(auth_cookie, admin_pass):
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-    correct_username = secrets.compare_digest(credentials.username, admin_user)
-    correct_password = secrets.compare_digest(credentials.password, admin_pass)
-    
-    if not (correct_username and correct_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": 'Basic realm="Political Discourse Analyzer"'},
-        )
-    return credentials.username
-
-app = FastAPI(title="Political Discourse Analyzer Dashboard", dependencies=[Depends(get_current_username)])
+app = FastAPI(title="Political Discourse Analyzer Dashboard")
 
 # DynamoDB Configuration
 DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "analyses")
@@ -131,12 +105,27 @@ def get_db_value(raw_val):
 
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard(request: Request):
+    auth_cookie = request.cookies.get("session_auth")
+    admin_pass = os.environ.get("ADMIN_PASSWORD")
+    if not admin_pass or not auth_cookie or not secrets.compare_digest(auth_cookie, admin_pass):
+        return templates.TemplateResponse("login.html", {"request": request})
     return templates.TemplateResponse(
         request=request, name="dashboard.html", context={"request": request}
     )
 
+@app.post("/login", response_class=HTMLResponse)
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    admin_user = os.environ.get("ADMIN_USERNAME")
+    admin_pass = os.environ.get("ADMIN_PASSWORD")
+    
+    if admin_user and admin_pass and secrets.compare_digest(username, admin_user) and secrets.compare_digest(password, admin_pass):
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(key="session_auth", value=admin_pass, httponly=True, max_age=86400*30)
+        return response
+    return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
 
-@app.post("/analyze")
+
+@app.post("/analyze", dependencies=[Depends(check_auth)])
 async def analyze_discourse(payload: AnalysisRequest):
     input_text = payload.input_text.strip()
     if not input_text:
@@ -472,7 +461,7 @@ async def analyze_discourse(payload: AnalysisRequest):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@app.get("/history")
+@app.get("/history", dependencies=[Depends(check_auth)])
 async def get_history():
     try:
         response = analyses_table.scan(
@@ -486,7 +475,7 @@ async def get_history():
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-@app.get("/history/{report_id}")
+@app.get("/history/{report_id}", dependencies=[Depends(check_auth)])
 async def get_report(report_id: str):
     try:
         response = analyses_table.get_item(Key={"id": report_id})
@@ -527,7 +516,7 @@ async def get_report(report_id: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.delete("/history/{report_id}")
+@app.delete("/history/{report_id}", dependencies=[Depends(check_auth)])
 async def delete_report(report_id: str):
     try:
         analyses_table.delete_item(Key={"id": report_id})
