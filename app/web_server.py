@@ -26,9 +26,16 @@ from app.agent import root_agent
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("discourse_anal_web")
 
-security = HTTPBasic()
+security = HTTPBasic(auto_error=False)
 
 def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized",
+            headers={"WWW-Authenticate": 'Basic realm="Political Discourse Analyzer"'},
+        )
+        
     admin_user = os.environ.get("ADMIN_USERNAME")
     admin_pass = os.environ.get("ADMIN_PASSWORD")
     
@@ -46,7 +53,7 @@ def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Basic"},
+            headers={"WWW-Authenticate": 'Basic realm="Political Discourse Analyzer"'},
         )
     return credentials.username
 
