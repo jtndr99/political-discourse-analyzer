@@ -7,6 +7,7 @@ import boto3
 
 import uvicorn
 import secrets
+import hashlib
 from fastapi import FastAPI, HTTPException, Request, Depends, status, Form
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -25,10 +26,16 @@ from app.agent import root_agent
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("discourse_anal_web")
 
+def get_session_token(admin_pass: str) -> str:
+    return hashlib.sha256(f"discourse_salt_{admin_pass}".encode()).hexdigest()
+
 def check_auth(request: Request):
     auth_cookie = request.cookies.get("session_auth")
     admin_pass = os.environ.get("ADMIN_PASSWORD")
-    if not admin_pass or not auth_cookie or not secrets.compare_digest(auth_cookie, admin_pass):
+    if not admin_pass or not auth_cookie:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    expected_token = get_session_token(admin_pass)
+    if not secrets.compare_digest(auth_cookie, expected_token):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 app = FastAPI(title="Political Discourse Analyzer Dashboard")
@@ -107,8 +114,11 @@ def get_db_value(raw_val):
 async def get_dashboard(request: Request):
     auth_cookie = request.cookies.get("session_auth")
     admin_pass = os.environ.get("ADMIN_PASSWORD")
-    if not admin_pass or not auth_cookie or not secrets.compare_digest(auth_cookie, admin_pass):
+    
+    expected_token = get_session_token(admin_pass) if admin_pass else ""
+    if not admin_pass or not auth_cookie or not secrets.compare_digest(auth_cookie, expected_token):
         return templates.TemplateResponse("login.html", {"request": request})
+        
     return templates.TemplateResponse(
         request=request, name="dashboard.html", context={"request": request}
     )
@@ -120,7 +130,8 @@ async def login(request: Request, username: str = Form(...), password: str = For
     
     if admin_user and admin_pass and secrets.compare_digest(username, admin_user) and secrets.compare_digest(password, admin_pass):
         response = RedirectResponse(url="/", status_code=303)
-        response.set_cookie(key="session_auth", value=admin_pass, httponly=True, max_age=86400*30)
+        session_token = get_session_token(admin_pass)
+        response.set_cookie(key="session_auth", value=session_token, httponly=True, max_age=86400*30)
         return response
     return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
 
