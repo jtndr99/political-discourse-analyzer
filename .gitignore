@@ -205,3 +205,13 @@ tools/a2a-inspector/
 
 # Local databases
 analyses.db
+
+artifacts/adversarial_test_report.md
+
+# Scratch / exploratory study scripts
+scripts/gd.py
+scripts/qkv.py
+scripts/cross_encoding.py
+
+# Local AWS setup
+trust-policy.json

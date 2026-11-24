@@ -27,30 +27,40 @@ To avoid rate limits and model overloading, the system uses a pipeline of specia
 
 ```mermaid
 graph TD
-    A[User Input: Text or URL] --> B[InputAgent]
-    B -->|Scrapes/Cleans via BeautifulSoup| C[Clean Article Text]
+    A[User Input: Text or URL] --> B[capture_raw_input]
+    B -->|Deterministic Fetch| C[Raw Article Text]
     
-    C -->|Sequentially Executes| D[ParetoAnalyst]
-    D -->|Accumulates State| E[SowellAnalyst]
-    E -->|Accumulates State| F[MassPsychAnalyst]
-    F -->|Accumulates State| G[FoucaultAnalyst]
+    C -->|Evaluates Risk| D[SecurityAuditor]
+    D -->|Evaluates Relevance| E[ScopeClassifier]
+    E -->|Applies Tags| F[tag_article]
+    F -->|Early Stopping Logic| G{classify_input}
     
-    D & E & F & G -->|Grounding Concepts| MCP[local MCP Server]
+    G -->|If Safe & In Scope| H[ParetoAnalyst]
+    H -->|Accumulates State| I[SowellAnalyst]
+    I -->|Accumulates State| J[MassPsychAnalyst]
+    J -->|Accumulates State| K[FoucaultAnalyst]
+    K -->|Accumulates State| L[GroundingEvaluator]
     
-    G -->|All Analyst Reports| H[Synthesizer]
+    H & I & J & K -->|Grounding Concepts| MCP[local MCP Server]
     
-    H -->|Synthesized Report Payload| WS[Web Server]
+    L -->|All Analyst Reports| M[Synthesizer]
+    G -->|If Unsafe/Out of Scope| M
+    
+    M -->|Synthesized Report Payload| WS[Web Server]
     WS -->|Programmatic Save| DB[(analyses.db)]
-    WS -->|Real-time SSE Events| I[Web Dashboard]
+    WS -->|Real-time SSE Events| N[Web Dashboard]
 ```
 
 ### 🤖 Multi-Agent Pipeline (`app/agent.py`)
-- **`InputAgent`**: Scrapes a webpage or consumes raw text, stripping script and styling noise.
+- **`capture_raw_input_node`**: A deterministic Python node that scrapes a webpage or consumes raw text without LLM intervention to guarantee clean inputs.
+- **`SecurityAuditor`**: A hardened gatekeeper agent that evaluates the text for prompt injections, narrative overrides, or hostile instructions.
+- **`ScopeClassifier`**: Determines if the text is genuine political discourse, benign (e.g., cookie recipes), or satire.
 - **`ParetoAnalyst`**: Focuses on Pareto's residues and derivations.
 - **`SowellAnalyst`**: Focuses on Sowell's conflict visions and Carl Schmitt's Friend/Enemy polarity.
 - **`MassPsychAnalyst`**: Examines crowd suggestion, Hoffer's True Believers, and René Girard's Scapegoating.
 - **`FoucaultAnalyst`**: Analyzes the text for Power/Knowledge, Normalization, and Biopower boundaries.
-- **`Synthesizer`**: Compiles all individual analyst reports into a premium JSON report.
+- **`GroundingEvaluator`**: Fact-checks the aggregated output for hallucinated elements or fake quotes.
+- **`Synthesizer`**: Compiles all individual analyst reports (or refusal notices) into a premium JSON report.
 - **`Web Server`**: Orchestrates the run using `runner.run_async()`, streams progress chunks to the client via Server-Sent Events (SSE), and programmatically writes the final state to SQLite.
 
 ### 🔌 Custom MCP Server (`app/mcp_server.py`)
@@ -117,6 +127,13 @@ Execute tests to confirm agent validation, MCP tool call mechanics, and end-to-e
 ```bash
 uv run pytest tests/unit tests/integration
 ```
+
+### Run Adversarial Security Tests
+Execute the bespoke, live-model adversarial testing suite to validate prompt injection defenses and scope classifiers:
+```bash
+uv run python tests/adversarial_test_runner.py --runs 2 --delay 3
+```
+*Generates a markdown report tracking pass rates and structural invariants across 17+ edge-case categories.*
 
 ### Run Evaluation Scenarios
 We leverage `agents-cli eval` to run golden dataset evaluations and analyze performance:

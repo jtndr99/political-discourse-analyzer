@@ -1,13 +1,16 @@
 import logging
 import os
 import re
-import sqlite3
 import sys
 import uuid
+import boto3
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+import secrets
+import hashlib
+import time
+from fastapi import FastAPI, HTTPException, Request, Depends, status, Form
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -24,12 +27,36 @@ from app.agent import root_agent
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("discourse_anal_web")
 
+def create_session() -> str:
+    token = secrets.token_urlsafe(32)
+    sessions_table.put_item(Item={
+        "token": token,
+        "created_at": int(time.time()),
+        "expires_at": int(time.time()) + 86400 * 30,
+    })
+    return token
+
+def check_auth(request: Request):
+    auth_cookie = request.cookies.get("session_auth")
+    if not auth_cookie:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        item = sessions_table.get_item(Key={"token": auth_cookie}).get("Item")
+    except Exception as e:
+        logger.error(f"Error checking session in DynamoDB: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+        
+    if not item:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
 app = FastAPI(title="Political Discourse Analyzer Dashboard")
 
-# SQLite DB Path (Shared with MCP Server)
-DB_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "analyses.db"
-)
+# DynamoDB Configuration
+DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "analyses")
+DYNAMODB_SESSIONS_TABLE_NAME = os.environ.get("DYNAMODB_SESSIONS_TABLE_NAME", "discourse-sessions")
+dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+analyses_table = dynamodb.Table(DYNAMODB_TABLE_NAME)
+sessions_table = dynamodb.Table(DYNAMODB_SESSIONS_TABLE_NAME)
 
 # Jinja2 Templates setup
 TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
@@ -48,6 +75,7 @@ def parse_analyst_output(output_raw):
     Returns a tuple of (analysis_md, metrics_dict).
     """
     import json
+
     analysis_md = str(output_raw)
     metrics = {}
 
@@ -63,7 +91,9 @@ def parse_analyst_output(output_raw):
             logger.error(f"Failed to dump analyst Pydantic model: {e}")
     elif isinstance(output_raw, str) and output_raw.strip():
         # Strip markdown JSON wrappers if present
-        cleaned_str = re.sub(r"^```json\s*|\s*```$", "", output_raw.strip(), flags=re.MULTILINE)
+        cleaned_str = re.sub(
+            r"^```json\s*|\s*```$", "", output_raw.strip(), flags=re.MULTILINE
+        )
         # Try to parse as JSON first
         try:
             parsed = json.loads(cleaned_str)
@@ -82,6 +112,7 @@ def get_db_value(raw_val):
     Otherwise, returns the string representation as is.
     """
     import json
+
     if isinstance(raw_val, dict):
         return json.dumps(raw_val)
     elif hasattr(raw_val, "model_dump"):
@@ -94,12 +125,37 @@ def get_db_value(raw_val):
 
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard(request: Request):
+    auth_cookie = request.cookies.get("session_auth")
+    is_authenticated = False
+    if auth_cookie:
+        try:
+            item = sessions_table.get_item(Key={"token": auth_cookie}).get("Item")
+            if item:
+                is_authenticated = True
+        except Exception as e:
+            logger.error(f"Error checking session on dashboard: {e}")
+            
+    if not is_authenticated:
+        return templates.TemplateResponse(request=request, name="login.html", context={"request": request})
+        
     return templates.TemplateResponse(
         request=request, name="dashboard.html", context={"request": request}
     )
 
+@app.post("/login", response_class=HTMLResponse)
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    admin_user = os.environ.get("ADMIN_USERNAME")
+    admin_pass = os.environ.get("ADMIN_PASSWORD")
+    
+    if admin_user and admin_pass and secrets.compare_digest(username, admin_user) and secrets.compare_digest(password, admin_pass):
+        response = RedirectResponse(url="/", status_code=303)
+        session_token = create_session()
+        response.set_cookie(key="session_auth", value=session_token, httponly=True, max_age=86400*30)
+        return response
+    return templates.TemplateResponse(request=request, name="login.html", context={"request": request, "error": "Invalid credentials"})
 
-@app.post("/analyze")
+
+@app.post("/analyze", dependencies=[Depends(check_auth)])
 async def analyze_discourse(payload: AnalysisRequest):
     input_text = payload.input_text.strip()
     if not input_text:
@@ -114,7 +170,10 @@ async def analyze_discourse(payload: AnalysisRequest):
     # Initialize ADK runner and session service
     session_service = InMemorySessionService()
     await session_service.create_session(
-        app_name=app_name, user_id=user_id, session_id=session_id
+        app_name=app_name,
+        user_id=user_id,
+        session_id=session_id,
+        state={"user_input": input_text, "raw_input_text": input_text},
     )
     runner = Runner(
         agent=root_agent, app_name=app_name, session_service=session_service
@@ -122,6 +181,7 @@ async def analyze_discourse(payload: AnalysisRequest):
 
     async def event_generator():
         import json
+
         try:
             # Yield start event
             yield f"data: {json.dumps({'event': 'start', 'session_id': session_id})}\n\n"
@@ -134,45 +194,102 @@ async def analyze_discourse(payload: AnalysisRequest):
                     role="user", parts=[types.Part.from_text(text=input_text)]
                 ),
             ):
-                if event.author and event.is_final_response():
-                    logger.info(f"[{event.author}] Event generated (SSE)")
-                    
+                # Retrieve the active node name from path if running inside a workflow
+                node_name = event.author
+                if event.node_info and event.node_info.path:
+                    node_name = event.node_info.path.split("/")[-1].split("@")[0]
+
+                if node_name and event.is_final_response():
+                    logger.info(f"[{node_name}] Event generated (SSE)")
+
                     # Fetch session state for the partial result
                     session = await session_service.get_session(
                         app_name=app_name, user_id=user_id, session_id=session_id
                     )
                     state = session.state
-                    
+
                     event_type = None
                     payload_data = {}
-                    
-                    if event.author == "InputAgent":
+
+                    if node_name == "tag_article":
                         event_type = "input_processed"
                         payload_data = {"text": state.get("article_text", "")}
-                    elif event.author == "ParetoAnalyst":
+                    elif node_name == "ScopeClassifier":
+                        event_type = "input_classified"
+                        classification = state.get("scope_classification", {})
+                        if isinstance(classification, str):
+                            classification = {}
+                        payload_data = {
+                            "is_out_of_scope": classification.get(
+                                "is_out_of_scope", False
+                            ),
+                            "is_satire": classification.get("is_satire", False),
+                        }
+                    elif node_name == "SecurityAuditor":
+                        event_type = "security_completed"
+                        security = state.get("security_evaluation", {})
+                        if isinstance(security, str):
+                            security = {}
+                        payload_data = {
+                            "is_safe": security.get("is_safe", True),
+                            "risk_score": security.get("risk_score", 0),
+                            "reason": security.get("reason", "Input is safe"),
+                        }
+                    elif node_name == "ParetoAnalyst":
                         event_type = "pareto_completed"
                         pareto_raw = state.get("pareto_analysis", "")
                         pareto_md, pareto_metrics = parse_analyst_output(pareto_raw)
-                        payload_data = {"analysis": pareto_md, "metrics": pareto_metrics}
-                    elif event.author == "SowellAnalyst":
+                        payload_data = {
+                            "analysis": pareto_md,
+                            "metrics": pareto_metrics,
+                        }
+                    elif node_name == "SowellAnalyst":
                         event_type = "sowell_completed"
                         sowell_raw = state.get("sowell_analysis", "")
                         sowell_md, sowell_metrics = parse_analyst_output(sowell_raw)
-                        payload_data = {"analysis": sowell_md, "metrics": sowell_metrics}
-                    elif event.author == "MassPsychAnalyst":
+                        payload_data = {
+                            "analysis": sowell_md,
+                            "metrics": sowell_metrics,
+                        }
+                    elif node_name == "MassPsychAnalyst":
                         event_type = "mass_psych_completed"
                         mass_psych_raw = state.get("mass_psych_analysis", "")
-                        mass_psych_md, mass_psych_metrics = parse_analyst_output(mass_psych_raw)
-                        payload_data = {"analysis": mass_psych_md, "metrics": mass_psych_metrics}
-                    elif event.author == "FoucaultAnalyst":
+                        mass_psych_md, mass_psych_metrics = parse_analyst_output(
+                            mass_psych_raw
+                        )
+                        payload_data = {
+                            "analysis": mass_psych_md,
+                            "metrics": mass_psych_metrics,
+                        }
+                    elif node_name == "FoucaultAnalyst":
                         event_type = "foucault_completed"
                         foucault_raw = state.get("foucault_analysis", "")
-                        foucault_md, foucault_metrics = parse_analyst_output(foucault_raw)
-                        payload_data = {"analysis": foucault_md, "metrics": foucault_metrics}
-                    elif event.author == "Synthesizer":
+                        foucault_md, foucault_metrics = parse_analyst_output(
+                            foucault_raw
+                        )
+                        payload_data = {
+                            "analysis": foucault_md,
+                            "metrics": foucault_metrics,
+                        }
+                    elif node_name == "GroundingEvaluator":
+                        event_type = "grounding_completed"
+                        evaluation = state.get("grounding_evaluation", {})
+                        if isinstance(evaluation, str):
+                            evaluation = {}
+                        payload_data = {
+                            "is_grounded": evaluation.get("is_grounded", True),
+                            "grounding_score": evaluation.get("grounding_score", 100),
+                            "feedback": evaluation.get("feedback", ""),
+                            "hallucinated_elements": evaluation.get(
+                                "hallucinated_elements", []
+                            ),
+                        }
+                    elif node_name == "Synthesizer":
                         event_type = "synthesis_completed"
-                        final_report = state.get("final_report", "No final report generated.")
-                        
+                        final_report = state.get(
+                            "final_report", "No final report generated."
+                        )
+
                         # Programmatically parse title, summary, and report_md from final_report
                         title = "Discourse Analysis"
                         summary = ""
@@ -189,21 +306,35 @@ async def analyze_discourse(payload: AnalysisRequest):
                                 summary = report_dict.get("summary", summary)
                                 report_md = report_dict.get("report_md", report_md)
                             except Exception as e:
-                                logger.error(f"Failed to dump Pydantic model in SSE: {e}")
+                                logger.error(
+                                    f"Failed to dump Pydantic model in SSE: {e}"
+                                )
                         elif isinstance(final_report, str):
-                            cleaned_report = re.sub(r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE)
+                            cleaned_report = re.sub(
+                                r"^```json\s*|\s*```$",
+                                "",
+                                final_report.strip(),
+                                flags=re.MULTILINE,
+                            )
                             try:
                                 report_data = json.loads(cleaned_report)
                                 title = report_data.get("title", title)
                                 summary = report_data.get("summary", summary)
                                 report_md = report_data.get("report_md", report_md)
                             except Exception as e:
-                                logger.info(f"Synthesizer output is not JSON, treating as raw markdown: {e}")
+                                logger.info(
+                                    f"Synthesizer output is not JSON, treating as raw markdown: {e}"
+                                )
                                 report_md = final_report
                                 lines = final_report.strip().split("\n")
                                 for line in lines:
                                     if line.startswith("# "):
-                                        title = line[2:].strip().replace("*", "").replace("_", "")
+                                        title = (
+                                            line[2:]
+                                            .strip()
+                                            .replace("*", "")
+                                            .replace("_", "")
+                                        )
                                         break
 
                                 lower_report = final_report.lower()
@@ -211,7 +342,9 @@ async def analyze_discourse(payload: AnalysisRequest):
                                 for keyword in ["executive summary", "summary"]:
                                     summary_idx = lower_report.find(keyword)
                                     if summary_idx != -1:
-                                        summary_text = final_report[summary_idx + len(keyword):].strip()
+                                        summary_text = final_report[
+                                            summary_idx + len(keyword) :
+                                        ].strip()
                                         summary_text = summary_text.lstrip(":- \t\r\n")
                                         end_idx = len(summary_text)
                                         for term in ["\n\n", "\n#", "\n*"]:
@@ -221,25 +354,30 @@ async def analyze_discourse(payload: AnalysisRequest):
                                         summary = summary_text[:end_idx].strip()
                                         break
                                 if not summary:
-                                    content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
+                                    content_lines = [
+                                        line.strip()
+                                        for line in lines
+                                        if line.strip()
+                                        and not line.startswith(("#", ">", "*", "-"))
+                                    ]
                                     if content_lines:
                                         summary = " ".join(content_lines[:2])
                                         if len(summary) > 200:
                                             summary = summary[:197] + "..."
                         else:
                             report_md = str(final_report)
-                            
+
                         payload_data = {
                             "title": title,
                             "summary": summary,
-                            "report_md": report_md
+                            "report_md": report_md,
                         }
-                    
+
                     if event_type:
                         sse_msg = {
                             "event": event_type,
                             "session_id": session_id,
-                            "data": payload_data
+                            "data": payload_data,
                         }
                         yield f"data: {json.dumps(sse_msg)}\n\n"
 
@@ -248,10 +386,10 @@ async def analyze_discourse(payload: AnalysisRequest):
                 app_name=app_name, user_id=user_id, session_id=session_id
             )
             state = session.state
-            
+
             final_report = state.get("final_report", "No final report generated.")
             original_text = state.get("article_text", input_text)
-            
+
             pareto_raw = state.get("pareto_analysis", "")
             sowell_raw = state.get("sowell_analysis", "")
             mass_psych_raw = state.get("mass_psych_analysis", "")
@@ -275,7 +413,9 @@ async def analyze_discourse(payload: AnalysisRequest):
                 except Exception:
                     pass
             elif isinstance(final_report, str):
-                cleaned_report = re.sub(r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE)
+                cleaned_report = re.sub(
+                    r"^```json\s*|\s*```$", "", final_report.strip(), flags=re.MULTILINE
+                )
                 try:
                     report_data = json.loads(cleaned_report)
                     title = report_data.get("title", title)
@@ -294,7 +434,9 @@ async def analyze_discourse(payload: AnalysisRequest):
                     for keyword in ["executive summary", "summary"]:
                         summary_idx = lower_report.find(keyword)
                         if summary_idx != -1:
-                            summary_text = final_report[summary_idx + len(keyword):].strip()
+                            summary_text = final_report[
+                                summary_idx + len(keyword) :
+                            ].strip()
                             summary_text = summary_text.lstrip(":- \t\r\n")
                             end_idx = len(summary_text)
                             for term in ["\n\n", "\n#", "\n*"]:
@@ -304,36 +446,40 @@ async def analyze_discourse(payload: AnalysisRequest):
                             summary = summary_text[:end_idx].strip()
                             break
                     if not summary:
-                        content_lines = [line.strip() for line in lines if line.strip() and not line.startswith(("#", ">", "*", "-"))]
+                        content_lines = [
+                            line.strip()
+                            for line in lines
+                            if line.strip()
+                            and not line.startswith(("#", ">", "*", "-"))
+                        ]
                         if content_lines:
                             summary = " ".join(content_lines[:2])
                             if len(summary) > 200:
                                 summary = summary[:197] + "..."
 
-            db_id = None
+            db_id = str(uuid.uuid4())
             try:
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO analyses (title, source, report_md, summary, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        title,
-                        input_text,
-                        report_md,
-                        summary,
-                        original_text,
-                        get_db_value(pareto_raw),
-                        get_db_value(sowell_raw),
-                        get_db_value(mass_psych_raw),
-                        get_db_value(foucault_raw),
-                    ),
+                import datetime
+                created_at = datetime.datetime.utcnow().isoformat()
+                item = {
+                    "id": db_id,
+                    "created_at": created_at,
+                    "title": title,
+                    "source": input_text,
+                    "report_md": report_md,
+                    "summary": summary,
+                    "original_text": original_text,
+                    "pareto_analysis": get_db_value(pareto_raw),
+                    "sowell_analysis": get_db_value(sowell_raw),
+                    "mass_psych_analysis": get_db_value(mass_psych_raw),
+                    "foucault_analysis": get_db_value(foucault_raw),
+                }
+                analyses_table.put_item(Item=item)
+                logger.info(
+                    f"Successfully saved analysis report {db_id} to DynamoDB."
                 )
-                db_id = cursor.lastrowid
-                conn.commit()
-                conn.close()
-                logger.info(f"Successfully saved analysis report {db_id} to SQLite database programmatically.")
             except Exception as e:
-                logger.error(f"Failed to save analysis report to database: {e}")
+                logger.error(f"Failed to save analysis report to DynamoDB: {e}")
 
             # Yield complete event with database row ID
             yield f"data: {json.dumps({'event': 'complete', 'session_id': session_id, 'db_id': db_id})}\n\n"
@@ -345,52 +491,33 @@ async def analyze_discourse(payload: AnalysisRequest):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@app.get("/history")
+@app.get("/history", dependencies=[Depends(check_auth)])
 async def get_history():
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, title, source, summary, created_at FROM analyses ORDER BY id DESC"
+        response = analyses_table.scan(
+            ProjectionExpression="id, title, #src, summary, created_at",
+            ExpressionAttributeNames={"#src": "source"}
         )
-        rows = cursor.fetchall()
-        conn.close()
-
-        reports = []
-        for row in rows:
-            reports.append(
-                {
-                    "id": row[0],
-                    "title": row[1],
-                    "source": row[2],
-                    "summary": row[3],
-                    "created_at": row[4],
-                }
-            )
-        return JSONResponse(content=reports)
+        items = response.get('Items', [])
+        items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        return JSONResponse(content=items)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-@app.get("/history/{report_id}")
-async def get_report(report_id: int):
+@app.get("/history/{report_id}", dependencies=[Depends(check_auth)])
+async def get_report(report_id: str):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, title, source, report_md, summary, created_at, original_text, pareto_analysis, sowell_analysis, mass_psych_analysis, foucault_analysis FROM analyses WHERE id = ?",
-            (report_id,),
-        )
-        row = cursor.fetchone()
-        conn.close()
+        response = analyses_table.get_item(Key={"id": report_id})
+        item = response.get('Item')
 
-        if not row:
+        if not item:
             raise HTTPException(status_code=404, detail="Report not found")
 
-        pareto_db = row[7] or ""
-        sowell_db = row[8] or ""
-        mass_psych_db = row[9] or ""
-        foucault_db = row[10] or ""
+        pareto_db = item.get("pareto_analysis", "")
+        sowell_db = item.get("sowell_analysis", "")
+        mass_psych_db = item.get("mass_psych_analysis", "")
+        foucault_db = item.get("foucault_analysis", "")
 
         pareto_md, pareto_metrics = parse_analyst_output(pareto_db)
         sowell_md, sowell_metrics = parse_analyst_output(sowell_db)
@@ -398,13 +525,13 @@ async def get_report(report_id: int):
         foucault_md, foucault_metrics = parse_analyst_output(foucault_db)
 
         report = {
-            "id": row[0],
-            "title": row[1],
-            "source": row[2],
-            "report_md": row[3],
-            "summary": row[4],
-            "created_at": row[5],
-            "original_text": row[6] or "",
+            "id": item.get("id"),
+            "title": item.get("title"),
+            "source": item.get("source"),
+            "report_md": item.get("report_md"),
+            "summary": item.get("summary"),
+            "created_at": item.get("created_at"),
+            "original_text": item.get("original_text", ""),
             "pareto_analysis": pareto_md,
             "sowell_analysis": sowell_md,
             "mass_psych_analysis": mass_psych_md,
@@ -419,24 +546,17 @@ async def get_report(report_id: int):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.delete("/history/{report_id}")
-async def delete_report(report_id: int):
+@app.delete("/history/{report_id}", dependencies=[Depends(check_auth)])
+async def delete_report(report_id: str):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM analyses WHERE id = ?", (report_id,))
-        conn.commit()
-        conn.close()
-        return JSONResponse(content={"status": "success", "message": f"Report {report_id} deleted."})
+        analyses_table.delete_item(Key={"id": report_id})
+        return JSONResponse(
+            content={"status": "success", "message": f"Report {report_id} deleted."}
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 if __name__ == "__main__":
-    # Ensure analyses.db is initialized before starting
-    from app.mcp_server import init_db
-
-    init_db()
-
     # Run the web server
     uvicorn.run("app.web_server:app", host="127.0.0.1", port=8000, reload=True)
